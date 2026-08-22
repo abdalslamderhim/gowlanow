@@ -26,9 +26,15 @@ function render(d){
   $('#popular').innerHTML=popular.map((n,i)=>`<div class="pop" onclick="openStory(${n.id})"><b>${String(i+1).padStart(2,'0')}</b><span>${esc(n.title)}</span></div>`).join('');
   const cov=news.filter(n=>['تغطيات جولة','توثيق','مجتمع'].includes(n.category)).slice(0,4);
   $('#coverageGrid').innerHTML=cov.map(n=>`<article class="card" onclick="openStory(${n.id})"><div class="card-img" style="background-image:url('${esc(n.image||'assets/studio.jpg')}')"></div><div class="card-body"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.reporter||'جولة')} · ${esc(n.time||'')}</p></div></article>`).join('');
+  const reports=news.filter(n=>n.category==='تقارير').slice(0,3);
+  if(reports.length){
+    $('#reportsGrid').innerHTML=reports.map(n=>`<article onclick="openStory(${n.id})"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.excerpt||'')}</p></article>`).join('');
+  }
   const programs=[['صوت المجتمع','برنامج اجتماعي يضع الإنسان في قلب القصة.'],['من الميدان','حوار وتغطية مباشرة من موقع الحدث.'],['ذاكرة المكان','توثيق للقصص والأماكن والشهادات.']];
   $('#programsGrid').innerHTML=programs.map(p=>`<article class="program"><i>${esc(p[0].slice(0,1))}</i><div><h3>${esc(p[0])}</h3><p>${esc(p[1])}</p></div></article>`).join('');
-  $('#videosGrid').innerHTML=news.slice(0,4).map(n=>`<article class="video" onclick="openStory(${n.id})"><div class="thumb" style="background-image:url('${esc(n.image||'assets/studio.jpg')}')"><button class="play" onclick="event.stopPropagation();openStory(${n.id})">▶</button></div><h3>${esc(n.title)}</h3><span>${esc(n.category)}</span></article>`).join('');
+  let vids=news.filter(n=>n.category==='فيديو');
+  if(vids.length<4){vids=vids.concat(news.filter(n=>n.category!=='فيديو')).slice(0,4);}else{vids=vids.slice(0,4);}
+  $('#videosGrid').innerHTML=vids.map(n=>`<article class="video" onclick="openStory(${n.id})"><div class="thumb" style="background-image:url('${esc(n.image||'assets/studio.jpg')}')"><button class="play" onclick="event.stopPropagation();openStory(${n.id})">▶</button></div><h3>${esc(n.title)}</h3><span>${esc(n.category)}</span></article>`).join('');
   const reps=JSON.parse(localStorage.getItem('gowla_v32_reporters')||'null')||[['أحمد محمد','مراسل ميداني','الوسط'],['محمد عمر','مراسل جولة','الشرق'],['علي إبراهيم','مراسل وتصوير','الغرب'],['سارة أحمد','محررة ميدانية','الشمال']].map((r,i)=>({id:i,name:r[0],role:r[1],region:r[2]}));
   $('#reportersGrid').innerHTML=reps.map(p=>`<article class="person"><div class="avatar">${esc(p.name.slice(0,1))}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><span>${esc(p.region)}</span></article>`).join('');
 }

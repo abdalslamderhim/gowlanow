@@ -1,6 +1,11 @@
 {
-"name":"gowla-v3.2-static",
-"private":true,
-"version":"3.2.0",
-"scripts":{"build":"echo Gowla V3.2 static build ready"}
+  "name": "gowla-v4",
+  "private": true,
+  "version": "4.0.0",
+  "scripts": {
+    "build": "echo Gowla V4 build ready"
+  },
+  "dependencies": {
+    "pg": "^8.13.1"
+  }
 }

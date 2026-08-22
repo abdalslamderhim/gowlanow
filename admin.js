@@ -1,54 +1,204 @@
-const STORE='gowla_v32_news';
-const REP_STORE='gowla_v32_reporters';
-const seed=[
-{id:1,title:'جولة تتابع آخر المستجدات من الميدان',category:'محلي',excerpt:'تغطية مستمرة لأبرز الأحداث والوقائع مع تحديثات من مراسلي جولة.',body:'تتابع قناة جولة الحدث من الميدان وتنقل التفاصيل أولاً بأول.',image:'assets/studio.jpg',status:'published',breaking:true,featured:true,views:1840,time:'الآن',reporter:'أحمد محمد'},
-{id:2,title:'تغطية ميدانية: تفاصيل جديدة من قلب الحدث',category:'تغطيات جولة',excerpt:'مراسلو جولة في الميدان لنقل الصورة كاملة.',body:'تقرير ميداني مصور يضع الحدث في سياقه.',image:'assets/studio.jpg',status:'published',breaking:false,featured:true,views:1320,time:'قبل 18 دقيقة',reporter:'محمد عمر'},
-{id:3,title:'قصة إنسانية من المجتمع: حين تتحول المبادرة إلى أثر',category:'مجتمع',excerpt:'قصص الناس والمبادرات التي تصنع فرقاً حقيقياً.',body:'قصة إنسانية من المجتمع المحلي.',image:'assets/studio.jpg',status:'published',breaking:false,featured:false,views:980,time:'قبل 42 دقيقة',reporter:'سارة أحمد'},
-{id:4,title:'تقرير جولة: قراءة في المشهد وأبرز ما يجب معرفته',category:'تقارير',excerpt:'سياق وتحليل ومصادر تساعدك على فهم القصة.',body:'تقرير تحليلي من إعداد فريق جولة.',image:'assets/studio.jpg',status:'published',breaking:false,featured:false,views:760,time:'قبل ساعة',reporter:'علي إبراهيم'}
-];
-const seedReps=[['أحمد محمد','مراسل ميداني','الوسط'],['محمد عمر','مراسل جولة','الشرق'],['علي إبراهيم','مراسل وتصوير','الغرب'],['سارة أحمد','محررة ميدانية','الشمال']].map((r,i)=>({id:i+1,name:r[0],role:r[1],region:r[2],active:true}));
-function read(key, fallback){try{const x=JSON.parse(localStorage.getItem(key));if(Array.isArray(x)&&x.length)return x;}catch{} localStorage.setItem(key,JSON.stringify(fallback));return fallback;}
-function get(){return read(STORE,seed)} function reps(){return read(REP_STORE,seedReps)} function put(x){localStorage.setItem(STORE,JSON.stringify(x))} function putReps(x){localStorage.setItem(REP_STORE,JSON.stringify(x))}
-const $=s=>document.querySelector(s); let current='dashboard',editId=null;
-function esc(v=''){return String(v).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-function statusLabel(s){return s==='published'?'منشور':s==='draft'?'مسودة':s==='archived'?'مؤرشف':'مجدول'}
-function boot(){ $('#login').classList.add('hidden');$('#shell').classList.remove('hidden');$('#who').textContent='وضع تجريبي محلي • جاهز للمعاينة';$('#role').textContent='V3.2';render(); }
+const FN = '/.netlify/functions';
+const $ = s => document.querySelector(s);
+let current = 'dashboard', editId = null;
+let TOKEN = sessionStorage.getItem('gowla_admin_token') || '';
+let articlesCache = [];
+let reportersCache = [];
 
-// --- Login gate ---
-// ملاحظة أمنية: هذه حماية أساسية من جهة العميل فقط (كلمة مرور واحدة داخل الكود).
-// أي شخص يفتح "عرض المصدر" يقدر يشوف كلمة المرور. هذا ليس نظام حسابات حقيقيًا،
-// وهدفه فقط منع الدخول العرضي إلى حين ربط الموقع بنظام مستخدمين فعلي (V4).
-const ADMIN_SESSION_KEY='gowla_admin_session';
-const ADMIN_PASS='gowla2026';
-function attemptLogin(){
-  const val=($('#loginPass')?.value||'').trim();
-  if(val===ADMIN_PASS){
-    sessionStorage.setItem(ADMIN_SESSION_KEY,'1');
-    if($('#loginMsg'))$('#loginMsg').textContent='';
-    boot();
-  } else {
-    if($('#loginMsg'))$('#loginMsg').textContent='كلمة المرور غير صحيحة';
+function esc(v = '') { return String(v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
+function statusLabel(s) { return s === 'published' ? 'منشور' : s === 'draft' ? 'مسودة' : s === 'archived' ? 'مؤرشف' : 'مجدول'; }
+function authHeaders() { return TOKEN ? { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }; }
+function get() { return articlesCache; }
+function reps() { return reportersCache; }
+
+function handleAuthExpired() {
+  TOKEN = ''; sessionStorage.removeItem('gowla_admin_token');
+  $('#shell').classList.add('hidden'); $('#login').classList.remove('hidden');
+  if ($('#loginMsg')) $('#loginMsg').textContent = 'انتهت الجلسة، سجّلي الدخول مرة أخرى.';
+}
+
+async function loadArticles() {
+  try {
+    const res = await fetch(`${FN}/articles`, { headers: authHeaders() });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    const rows = await res.json();
+    articlesCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
+  } catch { articlesCache = []; }
+}
+async function loadReporters() {
+  try {
+    const res = await fetch(`${FN}/reporters`, { headers: authHeaders() });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    const rows = await res.json();
+    reportersCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
+  } catch { reportersCache = []; }
+}
+
+async function boot() {
+  $('#login').classList.add('hidden'); $('#shell').classList.remove('hidden');
+  $('#who').textContent = 'متصل بقاعدة البيانات الحقيقية'; $('#role').textContent = 'V4';
+  await Promise.all([loadArticles(), loadReporters()]);
+  render();
+}
+
+// --- تسجيل الدخول ---
+// كلمة المرور تُتحقق منها على الخادم (ضمن متغير بيئة ADMIN_PASSWORD في إعدادات Netlify)،
+// ولا تُخزَّن أبدًا داخل هذا الملف. التوكن الناتج صالح لمدة 12 ساعة فقط.
+async function attemptLogin() {
+  const val = ($('#loginPass')?.value || '').trim();
+  if (!val) return;
+  if ($('#loginMsg')) $('#loginMsg').textContent = 'جاري التحقق...';
+  try {
+    const res = await fetch(`${FN}/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ password: val }) });
+    const data = await res.json();
+    if (res.ok && data.token) {
+      TOKEN = data.token; sessionStorage.setItem('gowla_admin_token', TOKEN);
+      if ($('#loginMsg')) $('#loginMsg').textContent = '';
+      await boot();
+    } else {
+      if ($('#loginMsg')) $('#loginMsg').textContent = data.error || 'كلمة المرور غير صحيحة';
+    }
+  } catch {
+    if ($('#loginMsg')) $('#loginMsg').textContent = 'تعذر الاتصال بالخادم. تحققي من الاتصال وحاولي مجددًا.';
   }
 }
-if($('#loginBtn'))$('#loginBtn').onclick=attemptLogin;
-if($('#loginPass'))$('#loginPass').addEventListener('keydown',e=>{if(e.key==='Enter')attemptLogin();});
-$('#logout').onclick=()=>{sessionStorage.removeItem(ADMIN_SESSION_KEY);location.href='/';};
-if(sessionStorage.getItem(ADMIN_SESSION_KEY)==='1'){ boot(); }
+if ($('#loginBtn')) $('#loginBtn').onclick = attemptLogin;
+if ($('#loginPass')) $('#loginPass').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+$('#logout').onclick = () => { TOKEN = ''; sessionStorage.removeItem('gowla_admin_token'); location.href = '/'; };
+if (TOKEN) { boot(); }
 
-// --- Mobile sidebar toggle ---
-if($('#asideToggle'))$('#asideToggle').onclick=()=>$('#aside').classList.toggle('open');
-document.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{current=b.dataset.view;editId=null;document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));b.classList.add('active');if($('#aside'))$('#aside').classList.remove('open');render()});
-function render(){if(current==='dashboard')dashboard();if(current==='articles')articles();if(current==='new')form();if(current==='reporters')reporters();}
-function dashboard(){const a=get();const pub=a.filter(x=>x.status==='published');$('#title').textContent='نظرة عامة';$('#view').innerHTML=`<div class="content"><div class="notice"><b>V3.2</b> — غرفة أخبار محسّنة للمعاينة. يمكنك إنشاء الأخبار، رفع الصور من الهاتف، تحديد عاجل/رئيسي، ربط المراسل، والبحث والتصفية. البيانات محفوظة محليًا في هذا المتصفح إلى حين الربط بقاعدة بيانات حقيقية.</div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x=>x.status==='draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x=>x.status==='archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x=>x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x,y)=>y.id-x.id).slice(0,8).map(x=>`<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views||0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`}
-function articles(){const a=get();$('#title').textContent='الأخبار';$('#view').innerHTML=`<div class="content"><div class="toolbar"><div><h2>إدارة الأخبار</h2><small>${a.length} مادة في الأرشيف المحلي</small></div><button class="btn red" onclick="current='new';editId=null;render()">+ خبر جديد</button></div><div class="filters"><input id="searchArticles" placeholder="ابحث في العناوين..." oninput="filterArticles()"><select id="filterStatus" onchange="filterArticles()"><option value="">كل الحالات</option><option value="published">منشور</option><option value="draft">مسودة</option><option value="scheduled">مجدول</option><option value="archived">مؤرشف</option></select><select id="filterCat" onchange="filterArticles()"><option value="">كل التصنيفات</option>${['محلي','السودان','العالم','تغطيات جولة','توثيق','تقارير','مجتمع','فيديو'].map(c=>`<option>${c}</option>`).join('')}</select></div><div id="articleTable" class="table"></div></div>`;filterArticles()}
-function filterArticles(){const a=get();const q=($('#searchArticles')?.value||'').toLowerCase();const st=$('#filterStatus')?.value||'';const cat=$('#filterCat')?.value||'';const list=a.filter(x=>(!q||x.title.toLowerCase().includes(q))&&(st?x.status===st:x.status!=='archived')&&(!cat||x.category===cat));$('#articleTable').innerHTML=`<div class="tr head"><span>الحالة</span><span>العنوان</span><span>التصنيف</span><span>إجراء</span></div>`+list.map(x=>`<div class="tr"><span><i class="dot ${x.breaking?'red-dot':''}"></i>${statusLabel(x.status)}</span><span><b>${esc(x.title)}</b><small class="meta">${x.reporter?esc(x.reporter):'بدون مراسل'} ${x.featured?' • رئيسي':''} ${x.breaking?' • عاجل':''}</small></span><span class="hide">${esc(x.category)}</span><span class="actions"><button onclick="edit(${x.id})">تعديل</button><button onclick="toggleFeatured(${x.id})">${x.featured?'إلغاء الرئيسي':'رئيسي'}</button>${x.status==='archived'?`<button onclick="restore(${x.id})">استعادة</button>`:`<button class="red" onclick="archive(${x.id})">أرشفة</button>`}</span></div>`).join('')+(list.length?'':'<div class="empty">لا توجد مواد مطابقة.</div>')}
-function form(){const n=editId?get().find(x=>x.id===editId):{title:'',excerpt:'',body:'',status:'draft',breaking:false,featured:false,category:'محلي',image:'assets/studio.jpg',views:0,time:'الآن',reporter:''};const rs=reps();$('#title').textContent=editId?'تعديل خبر':'خبر جديد';$('#view').innerHTML=`<div class="content"><div class="form"><div class="form-head"><div><h2>${editId?'تعديل الخبر':'إنشاء خبر جديد'}</h2><small>اكتب، ارفع الصورة، ثم اختر حالة النشر.</small></div><span class="live-chip">غرفة الأخبار</span></div><div class="grid"><div class="field full"><label>عنوان الخبر *</label><input id="fTitle" value="${esc(n.title)}" placeholder="عنوان واضح ومباشر"></div><div class="field"><label>التصنيف</label><select id="fCat">${['محلي','السودان','العالم','تغطيات جولة','توثيق','تقارير','مجتمع','فيديو'].map(c=>`<option ${n.category===c?'selected':''}>${c}</option>`).join('')}</select></div><div class="field"><label>الحالة</label><select id="fStatus"><option value="draft" ${n.status==='draft'?'selected':''}>مسودة</option><option value="published" ${n.status==='published'?'selected':''}>منشور</option><option value="scheduled" ${n.status==='scheduled'?'selected':''}>مجدول</option><option value="archived" ${n.status==='archived'?'selected':''}>مؤرشف</option></select></div><div class="field"><label>المراسل</label><select id="fReporter"><option value="">بدون مراسل</option>${rs.map(r=>`<option ${n.reporter===r.name?'selected':''}>${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>وقت العرض</label><input id="fTime" value="${esc(n.time||'الآن')}" placeholder="الآن / قبل 10 دقائق"></div><div class="field full"><label>الملخص</label><input id="fExcerpt" value="${esc(n.excerpt)}" placeholder="ملخص يظهر في بطاقات الأخبار"></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image||'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image||'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضل صورة أفقية عالية الجودة. في هذه النسخة تحفظ الصورة داخل المتصفح.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking?'checked':''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured?'checked':''}> ⭐ وضع في الأخبار الرئيسية</label></div><div class="form-actions"><button class="btn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="current='articles';editId=null;render()">إلغاء</button></div></div></div>`}
-function previewImage(input){const f=input.files?.[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#fImage').value=r.result;$('#preview').src=r.result;$('#preview').style.display='block'};r.readAsDataURL(f)}
-function saveArticle(){const a=get();const old=editId?a.find(x=>x.id===editId):null;const item={id:editId||Date.now(),title:$('#fTitle').value.trim()||'خبر جديد',category:$('#fCat').value,excerpt:$('#fExcerpt').value.trim(),body:$('#fBody').value.trim(),image:$('#fImage').value.trim()||'assets/studio.jpg',status:$('#fStatus').value,breaking:$('#fBreaking').checked,featured:$('#fFeatured').checked,reporter:$('#fReporter').value,time:$('#fTime').value.trim()||'الآن',views:old?.views||0};if(item.featured){a.forEach(x=>x.featured=false)}if(editId){a[a.findIndex(x=>x.id===editId)]=item}else a.push(item);put(a);current='articles';editId=null;render();}
-function edit(id){editId=id;current='new';render()}
-function archive(id){if(confirm('أرشفة الخبر؟ سيختفي من الموقع لكن يبقى محفوظًا ويمكن استعادته لاحقًا.')){const a=get();const x=a.find(z=>z.id===id);if(x){x.status='archived';x.featured=false;x.breaking=false;put(a);filterArticles();}}}
-function restore(id){const a=get();const x=a.find(z=>z.id===id);if(x){x.status='draft';put(a);filterArticles();}}
-function toggleFeatured(id){const a=get();a.forEach(x=>x.featured=x.id===id?!x.featured:false);put(a);render()}
-function reporters(){const r=reps();$('#title').textContent='المراسلون';$('#view').innerHTML=`<div class="content"><div class="toolbar"><div><h2>شبكة مراسلي جولة</h2><small>يمكن ربط كل خبر بمراسل.</small></div><button class="btn" onclick="addReporter()">+ مراسل</button></div><div class="panel">${r.map(x=>`<div class="tr rep"><span class="avatar-mini">${esc(x.name.slice(0,1))}</span><span><b>${esc(x.name)}</b><small class="meta">${esc(x.role)} • ${esc(x.region)}</small></span><span class="hide">${x.active?'نشط':'غير نشط'}</span><span><button class="actions-btn" onclick="editReporter(${x.id})">تعديل</button></span></div>`).join('')}</div></div>`}
-function addReporter(){const name=prompt('اسم المراسل');if(!name)return;const r=reps();r.push({id:Date.now(),name,role:prompt('الصفة','مراسل جولة')||'مراسل جولة',region:prompt('المنطقة','')||'',active:true});putReps(r);render()}
-function editReporter(id){const r=reps();const x=r.find(z=>z.id===id);if(!x)return;x.name=prompt('اسم المراسل',x.name)||x.name;x.role=prompt('الصفة',x.role)||x.role;x.region=prompt('المنطقة',x.region)||x.region;putReps(r);render()}
+// --- القائمة الجانبية على الجوال ---
+if ($('#asideToggle')) $('#asideToggle').onclick = () => $('#aside').classList.toggle('open');
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  current = b.dataset.view; editId = null;
+  document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  if ($('#aside')) $('#aside').classList.remove('open');
+  render();
+});
+
+async function render() {
+  if (current === 'dashboard') { await loadArticles(); dashboard(); }
+  else if (current === 'articles') { await loadArticles(); articles(); }
+  else if (current === 'new') { await Promise.all([loadArticles(), loadReporters()]); form(); }
+  else if (current === 'reporters') { await loadReporters(); reporters(); }
+}
+
+function dashboard() {
+  const a = get(); const pub = a.filter(x => x.status === 'published');
+  $('#title').textContent = 'نظرة عامة';
+  $('#view').innerHTML = `<div class="content"><div class="notice"><b>V4</b> — غرفة أخبار متصلة بقاعدة بيانات حقيقية. أي خبر تنشرينه يظهر مباشرة لكل زوار الموقع من أي جهاز.</div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x => x.status === 'draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x => x.status === 'archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x => x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x, y) => y.id - x.id).slice(0, 8).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`;
+}
+
+function articles() {
+  const a = get();
+  $('#title').textContent = 'الأخبار';
+  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>إدارة الأخبار</h2><small>${a.length} مادة</small></div><button class="btn red" onclick="current='new';editId=null;render()">+ خبر جديد</button></div><div class="filters"><input id="searchArticles" placeholder="ابحث في العناوين..." oninput="filterArticles()"><select id="filterStatus" onchange="filterArticles()"><option value="">كل الحالات</option><option value="published">منشور</option><option value="draft">مسودة</option><option value="scheduled">مجدول</option><option value="archived">مؤرشف</option></select><select id="filterCat" onchange="filterArticles()"><option value="">كل التصنيفات</option>${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'مجتمع', 'فيديو'].map(c => `<option>${c}</option>`).join('')}</select></div><div id="articleTable" class="table"></div></div>`;
+  filterArticles();
+}
+
+function filterArticles() {
+  const a = get();
+  const q = ($('#searchArticles')?.value || '').toLowerCase();
+  const st = $('#filterStatus')?.value || '';
+  const cat = $('#filterCat')?.value || '';
+  const list = a.filter(x => (!q || x.title.toLowerCase().includes(q)) && (st ? x.status === st : x.status !== 'archived') && (!cat || x.category === cat));
+  $('#articleTable').innerHTML = `<div class="tr head"><span>الحالة</span><span>العنوان</span><span>التصنيف</span><span>إجراء</span></div>` +
+    list.map(x => `<div class="tr"><span><i class="dot ${x.breaking ? 'red-dot' : ''}"></i>${statusLabel(x.status)}</span><span><b>${esc(x.title)}</b><small class="meta">${x.reporter ? esc(x.reporter) : 'بدون مراسل'} ${x.featured ? ' • رئيسي' : ''} ${x.breaking ? ' • عاجل' : ''}</small></span><span class="hide">${esc(x.category)}</span><span class="actions"><button onclick="edit(${x.id})">تعديل</button><button onclick="toggleFeatured(${x.id})">${x.featured ? 'إلغاء الرئيسي' : 'رئيسي'}</button>${x.status === 'archived' ? `<button onclick="restore(${x.id})">استعادة</button>` : `<button class="red" onclick="archive(${x.id})">أرشفة</button>`}</span></div>`).join('') +
+    (list.length ? '' : '<div class="empty">لا توجد مواد مطابقة.</div>');
+}
+
+function form() {
+  const n = editId ? get().find(x => x.id === editId) : { title: '', excerpt: '', body: '', status: 'draft', breaking: false, featured: false, category: 'محلي', image: 'assets/studio.jpg', views: 0, time_label: 'الآن', reporter: '' };
+  const rs = reps();
+  $('#title').textContent = editId ? 'تعديل خبر' : 'خبر جديد';
+  $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${editId ? 'تعديل الخبر' : 'إنشاء خبر جديد'}</h2><small>اكتب، ارفع الصورة، ثم اختر حالة النشر.</small></div><span class="live-chip">غرفة الأخبار</span></div><div class="grid"><div class="field full"><label>عنوان الخبر *</label><input id="fTitle" value="${esc(n.title)}" placeholder="عنوان واضح ومباشر"></div><div class="field"><label>التصنيف</label><select id="fCat">${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'مجتمع', 'فيديو'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="field"><label>الحالة</label><select id="fStatus"><option value="draft" ${n.status === 'draft' ? 'selected' : ''}>مسودة</option><option value="published" ${n.status === 'published' ? 'selected' : ''}>منشور</option><option value="scheduled" ${n.status === 'scheduled' ? 'selected' : ''}>مجدول</option><option value="archived" ${n.status === 'archived' ? 'selected' : ''}>مؤرشف</option></select></div><div class="field"><label>المراسل</label><select id="fReporter"><option value="">بدون مراسل</option>${rs.map(r => `<option ${n.reporter === r.name ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>وقت العرض</label><input id="fTime" value="${esc(n.time_label || 'الآن')}" placeholder="الآن / قبل 10 دقائق"></div><div class="field full"><label>الملخص</label><input id="fExcerpt" value="${esc(n.excerpt)}" placeholder="ملخص يظهر في بطاقات الأخبار"></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image || 'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image || 'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking ? 'checked' : ''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured ? 'checked' : ''}> ⭐ وضع في الأخبار الرئيسية</label></div><div class="form-actions"><button class="btn" id="saveBtn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="current='articles';editId=null;render()">إلغاء</button></div></div></div>`;
+}
+
+function previewImage(input) {
+  const f = input.files?.[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { $('#fImage').value = r.result; $('#preview').src = r.result; $('#preview').style.display = 'block'; };
+  r.readAsDataURL(f);
+}
+
+async function saveArticle() {
+  const item = {
+    id: editId || undefined,
+    title: $('#fTitle').value.trim() || 'خبر جديد',
+    category: $('#fCat').value,
+    excerpt: $('#fExcerpt').value.trim(),
+    body: $('#fBody').value.trim(),
+    image: $('#fImage').value.trim() || 'assets/studio.jpg',
+    status: $('#fStatus').value,
+    breaking: $('#fBreaking').checked,
+    featured: $('#fFeatured').checked,
+    reporter: $('#fReporter').value,
+    time_label: $('#fTime').value.trim() || 'الآن',
+  };
+  const btn = $('#saveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
+  try {
+    const res = await fetch(`${FN}/articles`, { method: editId ? 'PUT' : 'POST', headers: authHeaders(), body: JSON.stringify(item) });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    if (!res.ok) { alert('تعذر حفظ الخبر، حاولي مرة أخرى.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
+  current = 'articles'; editId = null; await render();
+}
+
+function edit(id) { editId = id; current = 'new'; render(); }
+
+async function archive(id) {
+  if (!confirm('أرشفة الخبر؟ سيختفي من الموقع لكن يبقى محفوظًا ويمكن استعادته لاحقًا.')) return;
+  try {
+    const res = await fetch(`${FN}/articles?id=${id}`, { method: 'DELETE', headers: authHeaders() });
+    if (res.status === 401) { handleAuthExpired(); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await loadArticles(); filterArticles();
+}
+
+async function restore(id) {
+  try {
+    const res = await fetch(`${FN}/articles`, { method: 'PATCH', headers: authHeaders(), body: JSON.stringify({ id, action: 'restore' }) });
+    if (res.status === 401) { handleAuthExpired(); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await loadArticles(); filterArticles();
+}
+
+async function toggleFeatured(id) {
+  const x = get().find(z => z.id === id); if (!x) return;
+  const item = { ...x, featured: !x.featured };
+  try {
+    const res = await fetch(`${FN}/articles`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(item) });
+    if (res.status === 401) { handleAuthExpired(); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await render();
+}
+
+function reporters() {
+  const r = reps();
+  $('#title').textContent = 'المراسلون';
+  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>شبكة مراسلي جولة</h2><small>يمكن ربط كل خبر بمراسل.</small></div><button class="btn" onclick="addReporter()">+ مراسل</button></div><div class="panel">${r.map(x => `<div class="tr rep"><span class="avatar-mini">${esc(x.name.slice(0, 1))}</span><span><b>${esc(x.name)}</b><small class="meta">${esc(x.role)} • ${esc(x.region)}</small></span><span class="hide">${x.active ? 'نشط' : 'غير نشط'}</span><span><button class="actions-btn" onclick="editReporter(${x.id})">تعديل</button></span></div>`).join('')}</div></div>`;
+}
+
+async function addReporter() {
+  const name = prompt('اسم المراسل'); if (!name) return;
+  const role = prompt('الصفة', 'مراسل جولة') || 'مراسل جولة';
+  const region = prompt('المنطقة', '') || '';
+  try {
+    const res = await fetch(`${FN}/reporters`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name, role, region, active: true }) });
+    if (res.status === 401) { handleAuthExpired(); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await render();
+}
+
+async function editReporter(id) {
+  const x = reps().find(z => z.id === id); if (!x) return;
+  const name = prompt('اسم المراسل', x.name) || x.name;
+  const role = prompt('الصفة', x.role) || x.role;
+  const region = prompt('المنطقة', x.region) || x.region;
+  try {
+    const res = await fetch(`${FN}/reporters`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ id, name, role, region, active: x.active }) });
+    if (res.status === 401) { handleAuthExpired(); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await render();
+}

@@ -1,6 +1,6 @@
 {
-  "name":"gowla-v3.1-static",
-  "private":true,
-  "version":"3.1.0",
-  "scripts":{"build":"echo Gowla V3.1 static build ready"}
+"name":"gowla-v3.2-static",
+"private":true,
+"version":"3.2.0",
+"scripts":{"build":"echo Gowla V3.2 static build ready"}
 }

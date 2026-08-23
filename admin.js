@@ -87,7 +87,7 @@ async function render() {
 function dashboard() {
   const a = get(); const pub = a.filter(x => x.status === 'published');
   $('#title').textContent = 'نظرة عامة';
-  $('#view').innerHTML = `<div class="content"><div class="notice"><b>V4</b> — غرفة أخبار متصلة بقاعدة بيانات حقيقية. أي خبر تنشرينه يظهر مباشرة لكل زوار الموقع من أي جهاز.</div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x => x.status === 'draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x => x.status === 'archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x => x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x, y) => y.id - x.id).slice(0, 8).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`;
+  $('#view').innerHTML = `<div class="content"><div class="notice"><b>V4</b> — غرفة أخبار متصلة بقاعدة بيانات حقيقية. أي خبر تنشرينه يظهر مباشرة لكل زوار الموقع من أي جهاز.</div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x => x.status === 'draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x => x.status === 'scheduled').length}</b><span>مجدول</span></div><div class="stat"><b>${a.filter(x => x.status === 'archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x => x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x, y) => y.id - x.id).slice(0, 8).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`;
 }
 
 function articles() {
@@ -108,11 +108,21 @@ function filterArticles() {
     (list.length ? '' : '<div class="empty">لا توجد مواد مطابقة.</div>');
 }
 
+function toLocalInputValue(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const pad = x => String(x).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 function form() {
-  const n = editId ? get().find(x => x.id === editId) : { title: '', excerpt: '', body: '', status: 'draft', breaking: false, featured: false, category: 'محلي', image: 'assets/studio.jpg', views: 0, time_label: 'الآن', reporter: '' };
+  const n = editId ? get().find(x => x.id === editId) : { title: '', excerpt: '', body: '', status: 'draft', breaking: false, featured: false, category: 'محلي', image: 'assets/studio.jpg', views: 0, time_label: 'الآن', reporter: '', scheduled_at: null };
   const rs = reps();
   $('#title').textContent = editId ? 'تعديل خبر' : 'خبر جديد';
-  $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${editId ? 'تعديل الخبر' : 'إنشاء خبر جديد'}</h2><small>اكتب، ارفع الصورة، ثم اختر حالة النشر.</small></div><span class="live-chip">غرفة الأخبار</span></div><div class="grid"><div class="field full"><label>عنوان الخبر *</label><input id="fTitle" value="${esc(n.title)}" placeholder="عنوان واضح ومباشر"></div><div class="field"><label>التصنيف</label><select id="fCat">${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'مجتمع', 'فيديو'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="field"><label>الحالة</label><select id="fStatus"><option value="draft" ${n.status === 'draft' ? 'selected' : ''}>مسودة</option><option value="published" ${n.status === 'published' ? 'selected' : ''}>منشور</option><option value="scheduled" ${n.status === 'scheduled' ? 'selected' : ''}>مجدول</option><option value="archived" ${n.status === 'archived' ? 'selected' : ''}>مؤرشف</option></select></div><div class="field"><label>المراسل</label><select id="fReporter"><option value="">بدون مراسل</option>${rs.map(r => `<option ${n.reporter === r.name ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>وقت العرض</label><input id="fTime" value="${esc(n.time_label || 'الآن')}" placeholder="الآن / قبل 10 دقائق"></div><div class="field full"><label>الملخص</label><input id="fExcerpt" value="${esc(n.excerpt)}" placeholder="ملخص يظهر في بطاقات الأخبار"></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image || 'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image || 'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking ? 'checked' : ''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured ? 'checked' : ''}> ⭐ وضع في الأخبار الرئيسية</label></div><div class="form-actions"><button class="btn" id="saveBtn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="current='articles';editId=null;render()">إلغاء</button></div></div></div>`;
+  $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${editId ? 'تعديل الخبر' : 'إنشاء خبر جديد'}</h2><small>اكتب، ارفع الصورة، ثم اختر حالة النشر.</small></div><span class="live-chip" id="draftChip">غرفة الأخبار</span></div><div class="grid"><div class="field full"><label>عنوان الخبر *</label><input id="fTitle" value="${esc(n.title)}" placeholder="عنوان واضح ومباشر"></div><div class="field"><label>التصنيف</label><select id="fCat">${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'مجتمع', 'فيديو'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="field"><label>الحالة</label><select id="fStatus"><option value="draft" ${n.status === 'draft' ? 'selected' : ''}>مسودة</option><option value="published" ${n.status === 'published' ? 'selected' : ''}>منشور</option><option value="scheduled" ${n.status === 'scheduled' ? 'selected' : ''}>مجدول</option><option value="archived" ${n.status === 'archived' ? 'selected' : ''}>مؤرشف</option></select></div><div class="field"><label>موعد النشر (عند اختيار "مجدول")</label><input id="fSchedule" type="datetime-local" value="${toLocalInputValue(n.scheduled_at)}"></div><div class="field"><label>المراسل</label><select id="fReporter"><option value="">بدون مراسل</option>${rs.map(r => `<option ${n.reporter === r.name ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>وقت العرض</label><input id="fTime" value="${esc(n.time_label || 'الآن')}" placeholder="الآن / قبل 10 دقائق"></div><div class="field full"><label>الملخص</label><input id="fExcerpt" value="${esc(n.excerpt)}" placeholder="ملخص يظهر في بطاقات الأخبار"></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image || 'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image || 'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking ? 'checked' : ''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured ? 'checked' : ''}> ⭐ وضع في الأخبار الرئيسية</label></div><div class="form-actions"><button class="btn" id="saveBtn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="discardDraftAndLeave()">إلغاء</button></div></div></div>`;
+  restoreDraftIfAny();
+  attachAutosave();
 }
 
 function previewImage(input) {
@@ -131,6 +141,7 @@ async function saveArticle() {
     body: $('#fBody').value.trim(),
     image: $('#fImage').value.trim() || 'assets/studio.jpg',
     status: $('#fStatus').value,
+    scheduled_at: $('#fSchedule').value ? new Date($('#fSchedule').value).toISOString() : null,
     breaking: $('#fBreaking').checked,
     featured: $('#fFeatured').checked,
     reporter: $('#fReporter').value,
@@ -142,7 +153,81 @@ async function saveArticle() {
     if (res.status === 401) { handleAuthExpired(); return; }
     if (!res.ok) { alert('تعذر حفظ الخبر، حاولي مرة أخرى.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
   } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
+  clearDraftLocal();
   current = 'articles'; editId = null; await render();
+}
+
+// --- الحفظ التلقائي المحلي للمسودة (لا يُرسل شيئًا للخادم، فقط يحفظ في المتصفح) ---
+function draftKey() { return editId ? `gwola_draft_edit_${editId}` : 'gwola_draft_new'; }
+
+function collectDraftValues() {
+  return {
+    title: $('#fTitle')?.value || '',
+    category: $('#fCat')?.value || '',
+    excerpt: $('#fExcerpt')?.value || '',
+    body: $('#fBody')?.value || '',
+    image: $('#fImage')?.value || '',
+    status: $('#fStatus')?.value || '',
+    scheduled_at: $('#fSchedule')?.value || '',
+    reporter: $('#fReporter')?.value || '',
+    time_label: $('#fTime')?.value || '',
+    breaking: $('#fBreaking')?.checked || false,
+    featured: $('#fFeatured')?.checked || false,
+  };
+}
+
+function saveDraftLocal() {
+  try { localStorage.setItem(draftKey(), JSON.stringify({ t: Date.now(), v: collectDraftValues() })); } catch {}
+  const chip = $('#draftChip'); if (chip) chip.textContent = 'تم الحفظ التلقائي محليًا ✓';
+}
+
+function clearDraftLocal() {
+  try { localStorage.removeItem(draftKey()); } catch {}
+}
+
+function applyDraftValues(v) {
+  if (!v) return;
+  if ($('#fTitle')) $('#fTitle').value = v.title || '';
+  if ($('#fCat')) $('#fCat').value = v.category || $('#fCat').value;
+  if ($('#fExcerpt')) $('#fExcerpt').value = v.excerpt || '';
+  if ($('#fBody')) $('#fBody').value = v.body || '';
+  if ($('#fImage')) { $('#fImage').value = v.image || ''; if ($('#preview')) $('#preview').src = v.image || ''; }
+  if ($('#fStatus')) $('#fStatus').value = v.status || $('#fStatus').value;
+  if ($('#fSchedule')) $('#fSchedule').value = v.scheduled_at || '';
+  if ($('#fReporter')) $('#fReporter').value = v.reporter || '';
+  if ($('#fTime')) $('#fTime').value = v.time_label || '';
+  if ($('#fBreaking')) $('#fBreaking').checked = !!v.breaking;
+  if ($('#fFeatured')) $('#fFeatured').checked = !!v.featured;
+}
+
+function restoreDraftIfAny() {
+  let raw;
+  try { raw = localStorage.getItem(draftKey()); } catch { raw = null; }
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (confirm('يوجد مسودة محفوظة تلقائيًا لهذا الخبر لم تُرسَل بعد للخادم. هل تريد استعادتها؟')) {
+      applyDraftValues(parsed.v);
+    } else {
+      clearDraftLocal();
+    }
+  } catch { clearDraftLocal(); }
+}
+
+let autosaveTimer = null;
+function attachAutosave() {
+  const view = $('#view');
+  if (!view) return;
+  view.addEventListener('input', () => {
+    clearTimeout(autosaveTimer);
+    const chip = $('#draftChip'); if (chip) chip.textContent = 'جاري الحفظ التلقائي...';
+    autosaveTimer = setTimeout(saveDraftLocal, 800);
+  });
+}
+
+function discardDraftAndLeave() {
+  clearDraftLocal();
+  current = 'articles'; editId = null; render();
 }
 
 function edit(id) { editId = id; current = 'new'; render(); }

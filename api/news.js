@@ -67,6 +67,7 @@ module.exports = async (req, res) => {
 <meta name="twitter:description" content="${desc}">
 <meta name="twitter:image" content="${esc(image)}">
 <link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/dark-mode.css">
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
 <style>
   .article-wrap{max-width:800px;margin:0 auto;padding:24px 16px}
@@ -77,8 +78,9 @@ module.exports = async (req, res) => {
 </style>
 </head>
 <body>
-<header><div class="wrap head" style="padding:16px 0">
+<header><div class="wrap head" style="padding:16px 0;display:flex;align-items:center;justify-content:space-between">
 <a class="brand" href="/"><img src="/assets/logo.jpg" style="height:40px"><strong> جولة</strong></a>
+<button class="darkmode" id="darkModeToggle" aria-label="تبديل الوضع الليلي" title="الوضع الليلي">🌙</button>
 </div></header>
 <main class="article-wrap">
 <span class="story-cat">${esc(n.category || '')}</span>
@@ -86,8 +88,30 @@ module.exports = async (req, res) => {
 <div class="meta">${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</div>
 <img src="${esc(image)}" alt="${title}">
 <div class="body">${esc(n.body || n.excerpt || '')}</div>
+<div class="share-row">
+  <a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(n.title)}%20${encodeURIComponent(pageUrl)}">واتساب</a>
+  <a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(n.title)}&url=${encodeURIComponent(pageUrl)}">X</a>
+  <a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}">فيسبوك</a>
+  <button class="share-btn copy" id="copyLink" type="button">نسخ الرابط</button>
+</div>
 <a class="back" href="/">← العودة لكل الأخبار</a>
 </main>
+<script>
+  var b=document.getElementById('darkModeToggle');
+  var saved=localStorage.getItem('gwola-theme')==='dark';
+  if(saved){document.body.classList.add('dark');b.textContent='☀';}
+  b.onclick=function(){
+    var d=document.body.classList.toggle('dark');
+    localStorage.setItem('gwola-theme', d?'dark':'light');
+    b.textContent = d?'☀':'🌙';
+  };
+  var c=document.getElementById('copyLink');
+  c.onclick=function(){
+    navigator.clipboard && navigator.clipboard.writeText(location.href);
+    var old=c.textContent; c.textContent='تم النسخ ✓';
+    setTimeout(function(){c.textContent=old;},1500);
+  };
+</script>
 </body>
 </html>`;
 

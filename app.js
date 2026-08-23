@@ -82,7 +82,9 @@ function openStory(id, skipHistory) {
   const modal = $('#modal'); modal.classList.add('open');
   const box = modal.querySelector('.modal-box');
   const shareUrl = `${location.origin}/news/${n.id}`;
-  box.innerHTML = `<button id="closeStory">×</button><img class="story-image" src="${esc(n.image || 'assets/studio.jpg')}" alt=""><span class="story-cat">${esc(n.category)}</span><h2>${esc(n.title)}</h2><small>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</small><p class="story-body">${esc(n.body || n.excerpt || '')}</p><button id="copyLink" class="cta" type="button">نسخ رابط الخبر</button>`;
+  const shareText = encodeURIComponent(n.title);
+  const shareUrlEnc = encodeURIComponent(shareUrl);
+  box.innerHTML = `<button id="closeStory">×</button><img class="story-image" src="${esc(n.image || 'assets/studio.jpg')}" alt=""><span class="story-cat">${esc(n.category)}</span><h2>${esc(n.title)}</h2><small>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</small><p class="story-body">${esc(n.body || n.excerpt || '')}</p><div class="share-row"><a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${shareText}%20${shareUrlEnc}">واتساب</a><a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrlEnc}">X</a><a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${shareUrlEnc}">فيسبوك</a><button id="copyLink" class="share-btn copy" type="button">نسخ الرابط</button></div>`;
   $('#closeStory').onclick = () => closeStory();
   $('#copyLink').onclick = () => {
     navigator.clipboard?.writeText(shareUrl);
@@ -115,5 +117,22 @@ $('#q').oninput = e => {
   $('#results').innerHTML = q ? (results.map(r => `<div class="result"><b>${esc(r.title)}</b><small>${esc(r.category)} · ${esc(r.time_label || '')}</small></div>`).join('') || '<p>لا توجد نتائج.</p>') : '';
 };
 $('#menu').onclick = () => $('#nav').classList.toggle('open');
+
+// الوضع الليلي
+const darkBtn = $('#darkModeToggle');
+function applyDarkPref() {
+  const saved = localStorage.getItem('gwola-theme');
+  const isDark = saved === 'dark';
+  document.body.classList.toggle('dark', isDark);
+  if (darkBtn) darkBtn.textContent = isDark ? '☀' : '🌙';
+}
+if (darkBtn) {
+  darkBtn.onclick = () => {
+    const isDark = document.body.classList.toggle('dark');
+    localStorage.setItem('gwola-theme', isDark ? 'dark' : 'light');
+    darkBtn.textContent = isDark ? '☀' : '🌙';
+  };
+}
+applyDarkPref();
 
 load();

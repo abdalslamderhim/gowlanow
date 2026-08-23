@@ -1,4 +1,4 @@
-const FN = '/.netlify/functions';
+const FN = '/api';
 const $ = (s) => document.querySelector(s);
 
 // نسخة احتياطية تُستخدم فقط لو تعذّر الاتصال بالخادم (حتى لا تظهر صفحة فارغة)

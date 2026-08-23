@@ -1,4 +1,4 @@
-const FN = '/.netlify/functions';
+const FN = '/api';
 const $ = s => document.querySelector(s);
 let current = 'dashboard', editId = null;
 let TOKEN = sessionStorage.getItem('gowla_admin_token') || '';

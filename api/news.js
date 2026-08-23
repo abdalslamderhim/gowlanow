@@ -15,7 +15,7 @@ module.exports = async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM articles WHERE id = $1 AND status = 'published'`,
+      `SELECT * FROM articles WHERE id = $1 AND (status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now()))`,
       [id]
     );
     const n = rows[0];
@@ -24,6 +24,16 @@ module.exports = async (req, res) => {
       res.status(404).send('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الخبر غير موجود | جولة</title></head><body><h1>عذرًا، هذا الخبر غير موجود أو غير منشور.</h1><a href="/">العودة للرئيسية</a></body></html>');
       return;
     }
+
+    // تسجيل مشاهدة (لا ننتظر النتيجة حتى لا نبطئ عرض الصفحة)
+    pool.query('UPDATE articles SET views = COALESCE(views, 0) + 1 WHERE id = $1', [n.id]).catch(() => {});
+
+    const { rows: relatedRows } = await pool.query(
+      `SELECT id, title, image, time_label FROM articles
+       WHERE category = $1 AND id <> $2 AND (status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now()))
+       ORDER BY id DESC LIMIT 3`,
+      [n.category, n.id]
+    );
 
     const siteUrl = 'https://gowlanow.vercel.app';
     const pageUrl = `${siteUrl}/news/${n.id}`;
@@ -66,6 +76,7 @@ module.exports = async (req, res) => {
 <meta name="twitter:title" content="${title}">
 <meta name="twitter:description" content="${desc}">
 <meta name="twitter:image" content="${esc(image)}">
+<link rel="alternate" type="application/rss+xml" title="جولة" href="/rss.xml">
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/dark-mode.css">
 <script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
@@ -94,6 +105,15 @@ module.exports = async (req, res) => {
   <a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}">فيسبوك</a>
   <button class="share-btn copy" id="copyLink" type="button">نسخ الرابط</button>
 </div>
+${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
+  <h3>أخبار ذات صلة</h3>
+  <div style="display:grid;gap:12px">
+    ${relatedRows.map((r) => `<a href="/news/${r.id}" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit">
+      <img src="${esc(r.image || 'assets/studio.jpg')}" style="width:64px;height:64px;object-fit:cover;border-radius:8px">
+      <span style="font-size:14px;font-weight:700">${esc(r.title)}</span>
+    </a>`).join('')}
+  </div>
+</div>` : ''}
 <a class="back" href="/">← العودة لكل الأخبار</a>
 </main>
 <script>

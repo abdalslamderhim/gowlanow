@@ -67,18 +67,44 @@ function render(d, reps) {
 }
 
 let allNews = [];
-function openStory(id) {
+const siteTitle = document.title;
+
+function closeStory(skipHistory) {
+  $('#modal').classList.remove('open');
+  document.title = siteTitle;
+  if (!skipHistory && location.pathname.startsWith('/news/')) {
+    history.pushState({}, '', '/');
+  }
+}
+
+function openStory(id, skipHistory) {
   const n = allNews.find(x => x.id === id); if (!n) return;
   const modal = $('#modal'); modal.classList.add('open');
   const box = modal.querySelector('.modal-box');
-  box.innerHTML = `<button id="closeStory">×</button><img class="story-image" src="${esc(n.image || 'assets/studio.jpg')}" alt=""><span class="story-cat">${esc(n.category)}</span><h2>${esc(n.title)}</h2><small>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</small><p class="story-body">${esc(n.body || n.excerpt || '')}</p>`;
-  $('#closeStory').onclick = () => modal.classList.remove('open');
+  const shareUrl = `${location.origin}/news/${n.id}`;
+  box.innerHTML = `<button id="closeStory">×</button><img class="story-image" src="${esc(n.image || 'assets/studio.jpg')}" alt=""><span class="story-cat">${esc(n.category)}</span><h2>${esc(n.title)}</h2><small>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</small><p class="story-body">${esc(n.body || n.excerpt || '')}</p><button id="copyLink" class="cta" type="button">نسخ رابط الخبر</button>`;
+  $('#closeStory').onclick = () => closeStory();
+  $('#copyLink').onclick = () => {
+    navigator.clipboard?.writeText(shareUrl);
+    const btn = $('#copyLink'); const old = btn.textContent;
+    btn.textContent = 'تم النسخ ✓'; setTimeout(() => { btn.textContent = old; }, 1500);
+  };
+  document.title = `${n.title} | جولة`;
+  if (!skipHistory) history.pushState({ storyId: n.id }, '', shareUrl);
 }
+
+window.addEventListener('popstate', () => {
+  const m = location.pathname.match(/^\/news\/(\d+)$/);
+  if (m) openStory(Number(m[1]), true);
+  else closeStory(true);
+});
 
 async function load() {
   const [news, reps] = await Promise.all([getNews(), getReporters()]);
   allNews = news.map(n => ({ ...n, id: Number(n.id) }));
   render(allNews, reps);
+  const m = location.pathname.match(/^\/news\/(\d+)$/);
+  if (m) openStory(Number(m[1]), true);
 }
 
 $('#search').onclick = () => { $('#modal').classList.add('open'); $('#q').focus(); };

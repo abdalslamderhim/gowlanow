@@ -30,6 +30,17 @@ async function getReporters() {
   }
 }
 
+async function getTeam() {
+  try {
+    const res = await fetch(`${FN}/team`);
+    if (!res.ok) throw new Error('bad response');
+    const rows = await res.json();
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
 function render(d, reps) {
   const news = d.filter(n => n.status === 'published').sort((a, b) => Number(b.id) - Number(a.id));
   const breaking = news.filter(n => n.breaking);
@@ -83,9 +94,15 @@ function openStory(id) {
 }
 
 async function load() {
-  const [news, reps] = await Promise.all([getNews(), getReporters()]);
+  const [news, reps, team] = await Promise.all([getNews(), getReporters(), getTeam()]);
   allNews = news.map(n => ({ ...n, id: Number(n.id) }));
   render(allNews, reps);
+  const teamGrid = $('#teamGrid');
+  if (teamGrid) {
+    teamGrid.innerHTML = team.length
+      ? team.map(m => `<div class="team-card"><img src="${esc(m.photo || 'assets/studio.jpg')}" alt="${esc(m.name)}"><h3>${esc(m.name)}</h3><span>${esc(m.role || '')}</span>${m.bio ? `<p>${esc(m.bio)}</p>` : ''}</div>`).join('')
+      : `<p style="opacity:.7">لم تتم إضافة أعضاء الفريق بعد.</p>`;
+  }
 }
 
 $('#search').onclick = () => { $('#modal').classList.add('open'); $('#q').focus(); };

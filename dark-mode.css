@@ -19,6 +19,27 @@
 .social-icon.ig { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
 .social-icon.tt { background: #000; }
 
+/* ===== إصلاح قائمة الجوال المنسدلة (nav.open) — لم تكن معرَّفة أصلًا ===== */
+@media (max-width: 900px) {
+  nav.open {
+    display: flex !important;
+    flex-direction: column;
+    position: absolute;
+    top: 80px;
+    right: 0;
+    left: 0;
+    background: #fff;
+    padding: 10px 20px 16px;
+    box-shadow: 0 10px 24px rgba(0,0,0,.12);
+    z-index: 30;
+    gap: 4px;
+  }
+  nav.open a { padding: 12px 0 !important; border-bottom: 1px solid var(--l, #e6eaf2); }
+  nav.open a:last-child { border-bottom: none; }
+  body.dark nav.open { background: #0d1220 !important; }
+  body.dark nav.open a { border-bottom-color: #1d2436 !important; }
+}
+
 /* ===== شبكة الفريق (الصفحة الرئيسية وصفحة من نحن) ===== */
 .team-grid {
   display: grid;

@@ -4,12 +4,14 @@ let current = 'dashboard', editId = null;
 let TOKEN = sessionStorage.getItem('gowla_admin_token') || '';
 let articlesCache = [];
 let reportersCache = [];
+let teamCache = [];
 
 function esc(v = '') { return String(v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
 function statusLabel(s) { return s === 'published' ? 'منشور' : s === 'draft' ? 'مسودة' : s === 'archived' ? 'مؤرشف' : 'مجدول'; }
 function authHeaders() { return TOKEN ? { 'Authorization': 'Bearer ' + TOKEN, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' }; }
 function get() { return articlesCache; }
 function reps() { return reportersCache; }
+function teamMembers() { return teamCache; }
 
 function handleAuthExpired() {
   TOKEN = ''; sessionStorage.removeItem('gowla_admin_token');
@@ -32,6 +34,14 @@ async function loadReporters() {
     const rows = await res.json();
     reportersCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
   } catch { reportersCache = []; }
+}
+async function loadTeam() {
+  try {
+    const res = await fetch(`${FN}/team`, { headers: authHeaders() });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    const rows = await res.json();
+    teamCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
+  } catch { teamCache = []; }
 }
 
 async function boot() {
@@ -82,6 +92,7 @@ async function render() {
   else if (current === 'articles') { await loadArticles(); articles(); }
   else if (current === 'new') { await Promise.all([loadArticles(), loadReporters()]); form(); }
   else if (current === 'reporters') { await loadReporters(); reporters(); }
+  else if (current === 'team') { await loadTeam(); team(); }
 }
 
 function dashboard() {
@@ -287,6 +298,49 @@ async function editReporter(id) {
   try {
     const res = await fetch(`${FN}/reporters`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ id, name, role, region, active: x.active }) });
     if (res.status === 401) { handleAuthExpired(); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await render();
+}
+
+function team() {
+  const t = teamMembers();
+  $('#title').textContent = 'فريق العمل';
+  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>فريق قناة جولة</h2><small>يظهر هذا الفريق في صفحة "من نحن" العامة للزوار.</small></div><button class="btn" onclick="addTeamMember()">+ عضو جديد</button></div><div class="panel">${t.map(x => `<div class="tr rep"><span class="avatar-mini" style="overflow:hidden">${x.photo ? `<img src="${esc(x.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : esc((x.name || '؟').slice(0, 1))}</span><span><b>${esc(x.name)}</b><small class="meta">${esc(x.role || '')}</small></span><span class="hide">${esc(x.bio || '')}</span><span><button class="actions-btn" onclick="editTeamMember(${x.id})">تعديل</button><button class="actions-btn" onclick="delTeamMember(${x.id})">حذف</button></span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا يوجد أعضاء بعد.</p>'}</div></div>`;
+}
+
+async function addTeamMember() {
+  const name = prompt('اسم العضو'); if (!name) return;
+  const role = prompt('الصفة (مثال: رئيس تحرير، مصور، معد برامج)', '') || '';
+  const photo = prompt('رابط صورة العضو (اختياري)', '') || '';
+  const bio = prompt('نبذة قصيرة (اختياري)', '') || '';
+  try {
+    const res = await fetch(`${FN}/team`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name, role, photo, bio, order_index: teamMembers().length }) });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    if (!res.ok) { alert('تعذر إضافة العضو، حاولي مرة أخرى.'); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await render();
+}
+
+async function editTeamMember(id) {
+  const x = teamMembers().find(z => z.id === id); if (!x) return;
+  const name = prompt('اسم العضو', x.name) || x.name;
+  const role = prompt('الصفة', x.role) || x.role;
+  const photo = prompt('رابط صورة العضو', x.photo || '') || '';
+  const bio = prompt('نبذة قصيرة', x.bio || '') || '';
+  try {
+    const res = await fetch(`${FN}/team`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ id, name, role, photo, bio, order_index: x.order_index || 0 }) });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    if (!res.ok) { alert('تعذر حفظ التعديل، حاولي مرة أخرى.'); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await render();
+}
+
+async function delTeamMember(id) {
+  if (!confirm('حذف هذا العضو من الفريق؟')) return;
+  try {
+    const res = await fetch(`${FN}/team?id=${id}`, { method: 'DELETE', headers: authHeaders() });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    if (!res.ok) { alert('تعذر الحذف، حاولي مرة أخرى.'); return; }
   } catch { alert('تعذر الاتصال بالخادم.'); return; }
   await render();
 }

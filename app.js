@@ -51,12 +51,22 @@ function render(d, reps) {
   $('#coverageGrid').innerHTML = cov.map(n => `<article class="card" onclick="openStory(${n.id})"><div class="card-img" style="background-image:url('${esc(n.image || 'assets/studio.jpg')}')"></div><div class="card-body"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</p></div></article>`).join('');
 
   const reports = news.filter(n => n.category === 'تقارير').slice(0, 3);
-  if (reports.length) {
-    $('#reportsGrid').innerHTML = reports.map(n => `<article onclick="openStory(${n.id})"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.excerpt || '')}</p></article>`).join('');
+  $('#reportsGrid').innerHTML = reports.length
+    ? reports.map(n => `<article onclick="openStory(${n.id})"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.excerpt || '')}</p></article>`).join('')
+    : `<p style="color:inherit;opacity:.7">لا توجد تقارير منشورة حاليًا.</p>`;
+
+  const docs = news.filter(n => n.category === 'توثيق').slice(0, 3);
+  if (docs.length) {
+    const [main, ...sideDocs] = docs;
+    $('#docGrid').innerHTML = `<article onclick="openStory(${main.id})"><span>${esc(main.category)}</span><h2>${esc(main.title)}</h2><p>${esc(main.excerpt || '')}</p></article><div>${sideDocs.map(n => `<article onclick="openStory(${n.id})"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3></article>`).join('')}</div>`;
+  } else {
+    $('#docGrid').innerHTML = `<p style="opacity:.7">لا توجد مواد توثيقية منشورة حاليًا.</p>`;
   }
 
-  const programs = [['صوت المجتمع', 'برنامج اجتماعي يضع الإنسان في قلب القصة.'], ['من الميدان', 'حوار وتغطية مباشرة من موقع الحدث.'], ['ذاكرة المكان', 'توثيق للقصص والأماكن والشهادات.']];
-  $('#programsGrid').innerHTML = programs.map(p => `<article class="program"><i>${esc(p[0].slice(0, 1))}</i><div><h3>${esc(p[0])}</h3><p>${esc(p[1])}</p></div></article>`).join('');
+  const programsList = news.filter(n => n.category === 'برامج').slice(0, 3);
+  $('#programsGrid').innerHTML = programsList.length
+    ? programsList.map(n => `<article class="program" onclick="openStory(${n.id})"><i>${esc((n.title || '؟').slice(0, 1))}</i><div><h3>${esc(n.title)}</h3><p>${esc(n.excerpt || '')}</p></div></article>`).join('')
+    : `<p style="opacity:.7">لا توجد برامج منشورة حاليًا.</p>`;
 
   let vids = news.filter(n => n.category === 'فيديو');
   if (vids.length < 4) { vids = vids.concat(news.filter(n => n.category !== 'فيديو')).slice(0, 4); } else { vids = vids.slice(0, 4); }

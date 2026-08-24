@@ -67,49 +67,15 @@ function render(d, reps) {
 }
 
 let allNews = [];
-const siteTitle = document.title;
 
-function closeStory(skipHistory) {
-  $('#modal').classList.remove('open');
-  document.title = siteTitle;
-  if (!skipHistory && location.pathname.startsWith('/news/')) {
-    history.pushState({}, '', '/');
-  }
+function openStory(id) {
+  location.href = `/news/${id}`;
 }
-
-function openStory(id, skipHistory) {
-  const n = allNews.find(x => x.id === id); if (!n) return;
-  const modal = $('#modal'); modal.classList.add('open');
-  const box = modal.querySelector('.modal-box');
-  const shareUrl = `${location.origin}/news/${n.id}`;
-  const shareText = encodeURIComponent(n.title);
-  const shareUrlEnc = encodeURIComponent(shareUrl);
-  const related = allNews.filter(x => x.status === 'published' && x.category === n.category && x.id !== n.id).slice(0, 3);
-  const relatedHtml = related.length ? `<div class="related-wrap" style="margin-top:24px"><h3 style="font-size:15px">أخبار ذات صلة</h3><div style="display:grid;gap:10px">${related.map(r => `<a href="#" onclick="event.preventDefault();openStory(${r.id})" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit"><img src="${esc(r.image || 'assets/studio.jpg')}" style="width:56px;height:56px;object-fit:cover;border-radius:8px"><span style="font-size:13px;font-weight:700">${esc(r.title)}</span></a>`).join('')}</div></div>` : '';
-  box.innerHTML = `<button id="closeStory">×</button><img class="story-image" src="${esc(n.image || 'assets/studio.jpg')}" alt=""><span class="story-cat">${esc(n.category)}</span><h2>${esc(n.title)}</h2><small>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</small><p class="story-body">${esc(n.body || n.excerpt || '')}</p><div class="share-row"><a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${shareText}%20${shareUrlEnc}">واتساب</a><a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${shareText}&url=${shareUrlEnc}">X</a><a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${shareUrlEnc}">فيسبوك</a><button id="copyLink" class="share-btn copy" type="button">نسخ الرابط</button></div>${relatedHtml}`;
-  $('#closeStory').onclick = () => closeStory();
-  $('#copyLink').onclick = () => {
-    navigator.clipboard?.writeText(shareUrl);
-    const btn = $('#copyLink'); const old = btn.textContent;
-    btn.textContent = 'تم النسخ ✓'; setTimeout(() => { btn.textContent = old; }, 1500);
-  };
-  document.title = `${n.title} | جولة`;
-  if (!skipHistory) history.pushState({ storyId: n.id }, '', shareUrl);
-  fetch(`${FN}/track-view`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: n.id }) }).catch(() => {});
-}
-
-window.addEventListener('popstate', () => {
-  const m = location.pathname.match(/^\/news\/(\d+)$/);
-  if (m) openStory(Number(m[1]), true);
-  else closeStory(true);
-});
 
 async function load() {
   const [news, reps] = await Promise.all([getNews(), getReporters()]);
   allNews = news.map(n => ({ ...n, id: Number(n.id) }));
   render(allNews, reps);
-  const m = location.pathname.match(/^\/news\/(\d+)$/);
-  if (m) openStory(Number(m[1]), true);
 }
 
 $('#search').onclick = () => { $('#modal').classList.add('open'); $('#q').focus(); };

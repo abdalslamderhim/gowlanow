@@ -70,7 +70,7 @@ function render(d, reps) {
 
   let vids = news.filter(n => n.category === 'فيديو');
   if (vids.length < 4) { vids = vids.concat(news.filter(n => n.category !== 'فيديو')).slice(0, 4); } else { vids = vids.slice(0, 4); }
-  $('#videosGrid').innerHTML = vids.map(n => `<article class="video" onclick="openStory(${n.id})"><div class="thumb" style="background-image:url('${esc(n.image || 'assets/studio.jpg')}')"><button class="play" onclick="event.stopPropagation();openStory(${n.id})">▶</button></div><h3>${esc(n.title)}</h3><span>${esc(n.category)}</span></article>`).join('');
+  $('#videosGrid').innerHTML = vids.map(n => `<article class="video" onclick="openStory(${n.id})"><div class="thumb" style="background-image:url('${esc(n.image || 'assets/studio.jpg')}')"><button class="play" onclick="event.stopPropagation();openStory(${n.id})">▶</button>${n.video_url ? '<span style="position:absolute;top:8px;left:8px;background:#e11;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">فيديو</span>' : ''}</div><h3>${esc(n.title)}</h3><span>${esc(n.category)}</span></article>`).join('');
 
   const activeReps = reps.length ? reps : [{ name: 'أحمد محمد', role: 'مراسل ميداني', region: 'الوسط' }, { name: 'محمد عمر', role: 'مراسل جولة', region: 'الشرق' }];
   $('#reportersGrid').innerHTML = activeReps.map(p => `<article class="person"><div class="avatar">${esc(p.name.slice(0, 1))}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><span>${esc(p.region)}</span></article>`).join('');

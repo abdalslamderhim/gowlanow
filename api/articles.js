@@ -30,8 +30,8 @@ module.exports = async (req, res) => {
       const b = req.body || {};
       const { rows } = await pool.query(
         `INSERT INTO articles
-          (title, category, excerpt, body, image, status, breaking, featured, reporter, time_label, scheduled_at)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+          (title, category, excerpt, body, image, status, breaking, featured, reporter, time_label, scheduled_at, video_url)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
          RETURNING *`,
         [
           b.title || 'خبر جديد',
@@ -45,6 +45,7 @@ module.exports = async (req, res) => {
           b.reporter || '',
           b.time_label || 'الآن',
           b.scheduled_at || null,
+          b.video_url || null,
         ]
       );
       if (rows[0].featured) {
@@ -59,12 +60,12 @@ module.exports = async (req, res) => {
       const { rows } = await pool.query(
         `UPDATE articles SET
           title=$1, category=$2, excerpt=$3, body=$4, image=$5,
-          status=$6, breaking=$7, featured=$8, reporter=$9, time_label=$10, scheduled_at=$11, updated_at=now()
-         WHERE id=$12
+          status=$6, breaking=$7, featured=$8, reporter=$9, time_label=$10, scheduled_at=$11, video_url=$12, updated_at=now()
+         WHERE id=$13
          RETURNING *`,
         [
           b.title, b.category, b.excerpt, b.body, b.image,
-          b.status, !!b.breaking, !!b.featured, b.reporter, b.time_label, b.scheduled_at || null, b.id,
+          b.status, !!b.breaking, !!b.featured, b.reporter, b.time_label, b.scheduled_at || null, b.video_url || null, b.id,
         ]
       );
       if (b.featured) {

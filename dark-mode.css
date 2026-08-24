@@ -1,3 +1,49 @@
+/* ===== أيقونات التواصل الاجتماعي في الفوتر ===== */
+.social-links {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+}
+.social-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: #fff;
+  transition: opacity 0.2s;
+}
+.social-icon:hover { opacity: 0.85; }
+.social-icon.fb { background: #1877F2; }
+.social-icon.ig { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
+.social-icon.tt { background: #000; }
+
+/* ===== شبكة الفريق (الصفحة الرئيسية وصفحة من نحن) ===== */
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 16px;
+}
+.team-card {
+  text-align: center;
+  background: var(--s, #f5f7fb);
+  border-radius: 12px;
+  padding: 16px 10px;
+}
+.team-card img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover;
+  margin-bottom: 10px;
+}
+.team-card h3 { font-size: 14px; margin: 4px 0 2px; }
+.team-card span { font-size: 12px; color: var(--b, #1439d8); font-weight: 700; }
+.team-card p { font-size: 12px; color: #7a8497; margin-top: 8px; line-height: 1.6; }
+body.dark .team-card { background: #10162a !important; }
+body.dark .team-card span { color: #5d8bff !important; }
+
 /* ===== زر تبديل الوضع الليلي ===== */
 .darkmode {
   border: 1px solid var(--l, #e6eaf2);

@@ -4,6 +4,13 @@ function esc(v = '') {
   return String(v).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
 }
 
+function extractYouTube(url) {
+  if (!url) return null;
+  const m = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
+  if (!m) return null;
+  return { id: m[1], isShort: /\/shorts\//.test(url) };
+}
+
 module.exports = async (req, res) => {
   const pool = getPool();
   const id = Number(req.query.id);
@@ -40,6 +47,7 @@ module.exports = async (req, res) => {
     const image = n.image && n.image.startsWith('http') ? n.image : `${siteUrl}/${n.image || 'assets/studio.jpg'}`;
     const title = esc(n.title);
     const desc = esc(n.excerpt || (n.body || '').slice(0, 150));
+    const yt = extractYouTube(n.video_url);
 
     const jsonLd = {
       '@context': 'https://schema.org',
@@ -97,7 +105,7 @@ module.exports = async (req, res) => {
 <span class="story-cat">${esc(n.category || '')}</span>
 <h1>${title}</h1>
 <div class="meta">${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</div>
-<img src="${esc(image)}" alt="${title}">
+${yt ? `<div style="position:relative;padding-bottom:${yt.isShort ? '177.7' : '56.25'}%;height:0;overflow:hidden;border-radius:8px;margin-bottom:16px;${yt.isShort ? 'max-width:400px;margin-left:auto;margin-right:auto' : ''}"><iframe src="https://www.youtube.com/embed/${yt.id}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen loading="lazy"></iframe></div>` : `<img src="${esc(image)}" alt="${title}">`}
 <div class="body">${esc(n.body || n.excerpt || '')}</div>
 <div class="share-row">
   <a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(n.title)}%20${encodeURIComponent(pageUrl)}">واتساب</a>

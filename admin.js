@@ -5,6 +5,7 @@ let TOKEN = sessionStorage.getItem('gowla_admin_token') || '';
 let articlesCache = [];
 let reportersCache = [];
 let teamCache = [];
+let teamFormMode = null; // null = list view, 'new' = adding, or a member id = editing
 
 function esc(v = '') { return String(v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
 function statusLabel(s) { return s === 'published' ? 'منشور' : s === 'draft' ? 'مسودة' : s === 'archived' ? 'مؤرشف' : 'مجدول'; }
@@ -80,7 +81,7 @@ if (TOKEN) { boot(); }
 // --- القائمة الجانبية على الجوال ---
 if ($('#asideToggle')) $('#asideToggle').onclick = () => $('#aside').classList.toggle('open');
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
-  current = b.dataset.view; editId = null;
+  current = b.dataset.view; editId = null; teamFormMode = null;
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   if ($('#aside')) $('#aside').classList.remove('open');
@@ -303,35 +304,46 @@ async function editReporter(id) {
 }
 
 function team() {
+  if (teamFormMode !== null) { teamForm(); return; }
   const t = teamMembers();
   $('#title').textContent = 'فريق العمل';
-  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>فريق قناة جولة</h2><small>يظهر هذا الفريق في صفحة "من نحن" العامة للزوار.</small></div><button class="btn" onclick="addTeamMember()">+ عضو جديد</button></div><div class="panel">${t.map(x => `<div class="tr rep"><span class="avatar-mini" style="overflow:hidden">${x.photo ? `<img src="${esc(x.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : esc((x.name || '؟').slice(0, 1))}</span><span><b>${esc(x.name)}</b><small class="meta">${esc(x.role || '')}</small></span><span class="hide">${esc(x.bio || '')}</span><span><button class="actions-btn" onclick="editTeamMember(${x.id})">تعديل</button><button class="actions-btn" onclick="delTeamMember(${x.id})">حذف</button></span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا يوجد أعضاء بعد.</p>'}</div></div>`;
+  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>فريق قناة جولة</h2><small>يظهر هذا الفريق في الصفحة الرئيسية وصفحة "من نحن" العامة للزوار.</small></div><button class="btn" onclick="teamFormMode='new';render()">+ عضو جديد</button></div><div class="panel">${t.map(x => `<div class="tr rep"><span class="avatar-mini" style="overflow:hidden">${x.photo ? `<img src="${esc(x.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : esc((x.name || '؟').slice(0, 1))}</span><span><b>${esc(x.name)}</b><small class="meta">${esc(x.role || '')}</small></span><span class="hide">${esc(x.bio || '')}</span><span><button class="actions-btn" onclick="teamFormMode=${x.id};render()">تعديل</button><button class="actions-btn" onclick="delTeamMember(${x.id})">حذف</button></span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا يوجد أعضاء بعد.</p>'}</div></div>`;
 }
 
-async function addTeamMember() {
-  const name = prompt('اسم العضو'); if (!name) return;
-  const role = prompt('الصفة (مثال: رئيس تحرير، مصور، معد برامج)', '') || '';
-  const photo = prompt('رابط صورة العضو (اختياري)', '') || '';
-  const bio = prompt('نبذة قصيرة (اختياري)', '') || '';
-  try {
-    const res = await fetch(`${FN}/team`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name, role, photo, bio, order_index: teamMembers().length }) });
-    if (res.status === 401) { handleAuthExpired(); return; }
-    if (!res.ok) { alert('تعذر إضافة العضو، حاولي مرة أخرى.'); return; }
-  } catch { alert('تعذر الاتصال بالخادم.'); return; }
-  await render();
+function teamForm() {
+  const isNew = teamFormMode === 'new';
+  const x = isNew ? { name: '', role: '', photo: '', bio: '', order_index: teamMembers().length } : teamMembers().find(m => m.id === teamFormMode);
+  if (!x) { teamFormMode = null; team(); return; }
+  $('#title').textContent = isNew ? 'عضو جديد' : 'تعديل عضو';
+  $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${isNew ? 'إضافة عضو للفريق' : 'تعديل بيانات العضو'}</h2><small>الاسم والصفة يظهران في صفحة "من نحن".</small></div></div><div class="grid"><div class="field full"><label>الاسم *</label><input id="tName" value="${esc(x.name)}" placeholder="اسم العضو"></div><div class="field full"><label>الصفة</label><input id="tRole" value="${esc(x.role || '')}" placeholder="مثال: رئيس تحرير، مصور، معد برامج"></div><div class="field full"><label>نبذة قصيرة (اختياري)</label><input id="tBio" value="${esc(x.bio || '')}" placeholder="جملة أو جملتان عن العضو"></div><div class="field full"><label>صورة العضو</label><div class="upload"><input id="tPhoto" value="${esc(x.photo || '')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="tFile" type="file" accept="image/*" onchange="previewTeamPhoto(this)"><img id="tPreview" src="${esc(x.photo || '')}" style="${x.photo ? '' : 'display:none'}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="form-actions"><button class="btn" id="tSaveBtn" onclick="saveTeamMember()">${isNew ? 'إضافة العضو' : 'حفظ التعديل'}</button><button class="btn ghost" onclick="teamFormMode=null;render()">إلغاء</button></div></div></div>`;
 }
 
-async function editTeamMember(id) {
-  const x = teamMembers().find(z => z.id === id); if (!x) return;
-  const name = prompt('اسم العضو', x.name) || x.name;
-  const role = prompt('الصفة', x.role) || x.role;
-  const photo = prompt('رابط صورة العضو', x.photo || '') || '';
-  const bio = prompt('نبذة قصيرة', x.bio || '') || '';
+function previewTeamPhoto(input) {
+  const f = input.files?.[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { $('#tPhoto').value = r.result; $('#tPreview').src = r.result; $('#tPreview').style.display = 'block'; };
+  r.readAsDataURL(f);
+}
+
+async function saveTeamMember() {
+  const name = $('#tName').value.trim();
+  if (!name) { alert('اسم العضو مطلوب.'); return; }
+  const isNew = teamFormMode === 'new';
+  const item = {
+    id: isNew ? undefined : teamFormMode,
+    name,
+    role: $('#tRole').value.trim(),
+    bio: $('#tBio').value.trim(),
+    photo: $('#tPhoto').value.trim(),
+    order_index: isNew ? teamMembers().length : (teamMembers().find(m => m.id === teamFormMode)?.order_index || 0),
+  };
+  const btn = $('#tSaveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
   try {
-    const res = await fetch(`${FN}/team`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ id, name, role, photo, bio, order_index: x.order_index || 0 }) });
+    const res = await fetch(`${FN}/team`, { method: isNew ? 'POST' : 'PUT', headers: authHeaders(), body: JSON.stringify(item) });
     if (res.status === 401) { handleAuthExpired(); return; }
-    if (!res.ok) { alert('تعذر حفظ التعديل، حاولي مرة أخرى.'); return; }
-  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+    if (!res.ok) { alert('تعذر الحفظ، حاولي مرة أخرى.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة العضو' : 'حفظ التعديل'; } return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة العضو' : 'حفظ التعديل'; } return; }
+  teamFormMode = null;
   await render();
 }
 

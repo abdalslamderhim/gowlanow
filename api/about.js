@@ -42,6 +42,9 @@ module.exports = async (req, res) => {
   .team-card span{font-size:12px;color:var(--b,#1439d8);font-weight:700}
   .team-card p{font-size:12px;color:#7a8497;margin-top:8px;line-height:1.6}
   body.dark .team-card{background:#10162a!important}
+  .share-row{display:flex;flex-wrap:wrap;gap:8px}
+  .share-btn{flex:1 1 auto;min-width:90px;text-align:center;padding:10px 14px;border-radius:7px;font-size:12px;font-weight:800;text-decoration:none;color:#fff;border:none;cursor:pointer}
+  .share-btn.wa{background:#25D366}.share-btn.x{background:#000}.share-btn.fb{background:#1877F2}.share-btn.copy{background:var(--b,#1439d8)}
 </style>
 </head>
 <body>
@@ -57,6 +60,12 @@ module.exports = async (req, res) => {
 </div>
 <h2 style="margin-bottom:16px">فريق العمل</h2>
 <div class="team-grid">${teamHtml}</div>
+<div class="share-row" style="margin-top:32px">
+  <a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('تعرّف على قناة جولة وفريق العمل')}%20${encodeURIComponent(siteUrl + '/about')}">واتساب</a>
+  <a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent('تعرّف على قناة جولة وفريق العمل')}&url=${encodeURIComponent(siteUrl + '/about')}">X</a>
+  <a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl + '/about')}">فيسبوك</a>
+  <button class="share-btn copy" id="copyLink" type="button">نسخ الرابط</button>
+</div>
 </main>
 <script>
   var b=document.getElementById('darkModeToggle');
@@ -67,6 +76,12 @@ module.exports = async (req, res) => {
     localStorage.setItem('gwola-theme', d?'dark':'light');
     b.textContent = d?'☀':'🌙';
   };
+  var c=document.getElementById('copyLink');
+  if(c){c.onclick=function(){
+    navigator.clipboard && navigator.clipboard.writeText(location.href);
+    var old=c.textContent; c.textContent='تم النسخ ✓';
+    setTimeout(function(){c.textContent=old;},1500);
+  };}
 </script>
 </body>
 </html>`;

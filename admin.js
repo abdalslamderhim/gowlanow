@@ -81,7 +81,7 @@ if (TOKEN) { boot(); }
 // --- القائمة الجانبية على الجوال ---
 if ($('#asideToggle')) $('#asideToggle').onclick = () => $('#aside').classList.toggle('open');
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
-  current = b.dataset.view; editId = null; teamFormMode = null;
+  current = b.dataset.view; editId = null; teamFormMode = null; repFormMode = null;
   document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
   b.classList.add('active');
   if ($('#aside')) $('#aside').classList.remove('open');
@@ -274,32 +274,49 @@ async function toggleFeatured(id) {
   await render();
 }
 
+let repFormMode = null; // null = list view, 'new' = adding, or a reporter id = editing
+
 function reporters() {
+  if (repFormMode !== null) { reporterForm(); return; }
   const r = reps();
   $('#title').textContent = 'المراسلون';
-  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>شبكة مراسلي جولة</h2><small>يمكن ربط كل خبر بمراسل.</small></div><button class="btn" onclick="addReporter()">+ مراسل</button></div><div class="panel">${r.map(x => `<div class="tr rep"><span class="avatar-mini">${esc(x.name.slice(0, 1))}</span><span><b>${esc(x.name)}</b><small class="meta">${esc(x.role)} • ${esc(x.region)}</small></span><span class="hide">${x.active ? 'نشط' : 'غير نشط'}</span><span><button class="actions-btn" onclick="editReporter(${x.id})">تعديل</button></span></div>`).join('')}</div></div>`;
+  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>شبكة مراسلي جولة</h2><small>يمكن ربط كل خبر بمراسل.</small></div><button class="btn" onclick="repFormMode='new';render()">+ مراسل</button></div><div class="panel">${r.map(x => `<div class="tr rep"><span class="avatar-mini" style="overflow:hidden">${x.photo ? `<img src="${esc(x.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : esc((x.name || '؟').slice(0, 1))}</span><span><b>${esc(x.name)}</b><small class="meta">${esc(x.role)} • ${esc(x.region)}</small></span><span class="hide">${x.active ? 'نشط' : 'غير نشط'}</span><span><button class="actions-btn" onclick="repFormMode=${x.id};render()">تعديل</button></span></div>`).join('')}</div></div>`;
 }
 
-async function addReporter() {
-  const name = prompt('اسم المراسل'); if (!name) return;
-  const role = prompt('الصفة', 'مراسل جولة') || 'مراسل جولة';
-  const region = prompt('المنطقة', '') || '';
-  try {
-    const res = await fetch(`${FN}/reporters`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ name, role, region, active: true }) });
-    if (res.status === 401) { handleAuthExpired(); return; }
-  } catch { alert('تعذر الاتصال بالخادم.'); return; }
-  await render();
+function reporterForm() {
+  const isNew = repFormMode === 'new';
+  const x = isNew ? { name: '', role: 'مراسل جولة', region: '', photo: '', active: true } : reps().find(m => m.id === repFormMode);
+  if (!x) { repFormMode = null; reporters(); return; }
+  $('#title').textContent = isNew ? 'مراسل جديد' : 'تعديل مراسل';
+  $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${isNew ? 'إضافة مراسل' : 'تعديل بيانات المراسل'}</h2><small>يمكن ربط كل خبر بمراسل عند النشر.</small></div></div><div class="grid"><div class="field full"><label>الاسم *</label><input id="rName" value="${esc(x.name)}" placeholder="اسم المراسل"></div><div class="field"><label>الصفة</label><input id="rRole" value="${esc(x.role || '')}" placeholder="مراسل جولة"></div><div class="field"><label>المنطقة</label><input id="rRegion" value="${esc(x.region || '')}" placeholder="مثال: الوسط، الشرق"></div><div class="field full"><label>صورة المراسل</label><div class="upload"><input id="rPhoto" value="${esc(x.photo || '')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="rFile" type="file" accept="image/*" onchange="previewRepPhoto(this)"><img id="rPreview" src="${esc(x.photo || '')}" style="${x.photo ? '' : 'display:none'}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="form-actions"><button class="btn" id="rSaveBtn" onclick="saveReporter()">${isNew ? 'إضافة المراسل' : 'حفظ التعديل'}</button><button class="btn ghost" onclick="repFormMode=null;render()">إلغاء</button></div></div></div>`;
 }
 
-async function editReporter(id) {
-  const x = reps().find(z => z.id === id); if (!x) return;
-  const name = prompt('اسم المراسل', x.name) || x.name;
-  const role = prompt('الصفة', x.role) || x.role;
-  const region = prompt('المنطقة', x.region) || x.region;
+function previewRepPhoto(input) {
+  const f = input.files?.[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { $('#rPhoto').value = r.result; $('#rPreview').src = r.result; $('#rPreview').style.display = 'block'; };
+  r.readAsDataURL(f);
+}
+
+async function saveReporter() {
+  const name = $('#rName').value.trim();
+  if (!name) { alert('اسم المراسل مطلوب.'); return; }
+  const isNew = repFormMode === 'new';
+  const item = {
+    id: isNew ? undefined : repFormMode,
+    name,
+    role: $('#rRole').value.trim() || 'مراسل جولة',
+    region: $('#rRegion').value.trim(),
+    photo: $('#rPhoto').value.trim(),
+    active: true,
+  };
+  const btn = $('#rSaveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
   try {
-    const res = await fetch(`${FN}/reporters`, { method: 'PUT', headers: authHeaders(), body: JSON.stringify({ id, name, role, region, active: x.active }) });
+    const res = await fetch(`${FN}/reporters`, { method: isNew ? 'POST' : 'PUT', headers: authHeaders(), body: JSON.stringify(item) });
     if (res.status === 401) { handleAuthExpired(); return; }
-  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+    if (!res.ok) { alert('تعذر الحفظ، حاولي مرة أخرى.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة المراسل' : 'حفظ التعديل'; } return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة المراسل' : 'حفظ التعديل'; } return; }
+  repFormMode = null;
   await render();
 }
 
@@ -356,3 +373,4 @@ async function delTeamMember(id) {
   } catch { alert('تعذر الاتصال بالخادم.'); return; }
   await render();
 }
+

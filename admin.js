@@ -5,6 +5,7 @@ let TOKEN = sessionStorage.getItem('gowla_admin_token') || '';
 let articlesCache = [];
 let reportersCache = [];
 let teamCache = [];
+let commentsCache = [];
 let teamFormMode = null; // null = list view, 'new' = adding, or a member id = editing
 
 function esc(v = '') { return String(v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
@@ -43,6 +44,14 @@ async function loadTeam() {
     const rows = await res.json();
     teamCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
   } catch { teamCache = []; }
+}
+async function loadComments() {
+  try {
+    const res = await fetch(`${FN}/comments`, { headers: authHeaders() });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    const rows = await res.json();
+    commentsCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
+  } catch { commentsCache = []; }
 }
 
 async function boot() {
@@ -94,12 +103,13 @@ async function render() {
   else if (current === 'new') { await Promise.all([loadArticles(), loadReporters()]); form(); }
   else if (current === 'reporters') { await loadReporters(); reporters(); }
   else if (current === 'team') { await loadTeam(); team(); }
+  else if (current === 'comments') { await loadComments(); commentsView(); }
 }
 
 function dashboard() {
   const a = get(); const pub = a.filter(x => x.status === 'published');
   $('#title').textContent = 'نظرة عامة';
-  $('#view').innerHTML = `<div class="content"><div class="notice"><b>V4</b> — غرفة أخبار متصلة بقاعدة بيانات حقيقية. أي خبر تنشرينه يظهر مباشرة لكل زوار الموقع من أي جهاز.</div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x => x.status === 'draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x => x.status === 'scheduled').length}</b><span>مجدول</span></div><div class="stat"><b>${a.filter(x => x.status === 'archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x => x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x, y) => y.id - x.id).slice(0, 8).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`;
+  $('#view').innerHTML = `<div class="content"><div class="notice"><b>V4</b> — غرفة أخبار متصلة بقاعدة بيانات حقيقية. أي خبر تنشرينه يظهر مباشرة لكل زوار الموقع من أي جهاز.</div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x => x.status === 'draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x => x.status === 'scheduled').length}</b><span>مجدول</span></div><div class="stat"><b>${a.filter(x => x.status === 'archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x => x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>الأكثر قراءة</h2></div>${a.slice().sort((x, y) => Number(y.views || 0) - Number(x.views || 0)).slice(0, 5).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا توجد بيانات مشاهدات بعد.</p>'}</div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x, y) => y.id - x.id).slice(0, 8).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`;
 }
 
 function articles() {
@@ -129,19 +139,44 @@ function toLocalInputValue(iso) {
 }
 
 function form() {
-  const n = editId ? get().find(x => x.id === editId) : { title: '', excerpt: '', body: '', status: 'draft', breaking: false, featured: false, category: 'محلي', image: 'assets/studio.jpg', views: 0, time_label: 'الآن', reporter: '', scheduled_at: null, video_url: '' };
+  const n = editId ? get().find(x => x.id === editId) : { title: '', excerpt: '', body: '', status: 'draft', breaking: false, featured: false, category: 'محلي', image: 'assets/studio.jpg', views: 0, time_label: 'الآن', reporter: '', scheduled_at: null, video_url: '', gallery: '' };
   const rs = reps();
   $('#title').textContent = editId ? 'تعديل خبر' : 'خبر جديد';
-  $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${editId ? 'تعديل الخبر' : 'إنشاء خبر جديد'}</h2><small>اكتب، ارفع الصورة، ثم اختر حالة النشر.</small></div><span class="live-chip" id="draftChip">غرفة الأخبار</span></div><div class="grid"><div class="field full"><label>عنوان الخبر *</label><input id="fTitle" value="${esc(n.title)}" placeholder="عنوان واضح ومباشر"></div><div class="field"><label>التصنيف</label><select id="fCat">${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'برامج', 'مجتمع', 'فيديو'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="field"><label>الحالة</label><select id="fStatus"><option value="draft" ${n.status === 'draft' ? 'selected' : ''}>مسودة</option><option value="published" ${n.status === 'published' ? 'selected' : ''}>منشور</option><option value="scheduled" ${n.status === 'scheduled' ? 'selected' : ''}>مجدول</option><option value="archived" ${n.status === 'archived' ? 'selected' : ''}>مؤرشف</option></select></div><div class="field"><label>موعد النشر (عند اختيار "مجدول")</label><input id="fSchedule" type="datetime-local" value="${toLocalInputValue(n.scheduled_at)}"></div><div class="field"><label>المراسل</label><select id="fReporter"><option value="">بدون مراسل</option>${rs.map(r => `<option ${n.reporter === r.name ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>وقت العرض</label><input id="fTime" value="${esc(n.time_label || 'الآن')}" placeholder="الآن / قبل 10 دقائق"></div><div class="field full"><label>الملخص</label><input id="fExcerpt" value="${esc(n.excerpt)}" placeholder="ملخص يظهر في بطاقات الأخبار"></div><div class="field full"><label>رابط فيديو يوتيوب (اختياري — عادي أو Shorts)</label><input id="fVideoUrl" value="${esc(n.video_url || '')}" placeholder="https://www.youtube.com/watch?v=... أو https://youtube.com/shorts/..."></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image || 'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image || 'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking ? 'checked' : ''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured ? 'checked' : ''}> ⭐ وضع في الأخبار الرئيسية</label></div><div class="form-actions"><button class="btn" id="saveBtn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="discardDraftAndLeave()">إلغاء</button></div></div></div>`;
+  $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${editId ? 'تعديل الخبر' : 'إنشاء خبر جديد'}</h2><small>اكتب، ارفع الصورة، ثم اختر حالة النشر.</small></div><span class="live-chip" id="draftChip">غرفة الأخبار</span></div><div class="grid"><div class="field full"><label>عنوان الخبر *</label><input id="fTitle" value="${esc(n.title)}" placeholder="عنوان واضح ومباشر"></div><div class="field"><label>التصنيف</label><select id="fCat">${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'برامج', 'مجتمع', 'فيديو'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="field"><label>الحالة</label><select id="fStatus"><option value="draft" ${n.status === 'draft' ? 'selected' : ''}>مسودة</option><option value="published" ${n.status === 'published' ? 'selected' : ''}>منشور</option><option value="scheduled" ${n.status === 'scheduled' ? 'selected' : ''}>مجدول</option><option value="archived" ${n.status === 'archived' ? 'selected' : ''}>مؤرشف</option></select></div><div class="field"><label>موعد النشر (عند اختيار "مجدول")</label><input id="fSchedule" type="datetime-local" value="${toLocalInputValue(n.scheduled_at)}"></div><div class="field"><label>المراسل</label><select id="fReporter"><option value="">بدون مراسل</option>${rs.map(r => `<option ${n.reporter === r.name ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>وقت العرض</label><input id="fTime" value="${esc(n.time_label || 'الآن')}" placeholder="الآن / قبل 10 دقائق"></div><div class="field full"><label>الملخص</label><input id="fExcerpt" value="${esc(n.excerpt)}" placeholder="ملخص يظهر في بطاقات الأخبار"></div><div class="field full"><label>رابط فيديو يوتيوب (اختياري — عادي أو Shorts)</label><input id="fVideoUrl" value="${esc(n.video_url || '')}" placeholder="https://www.youtube.com/watch?v=... أو https://youtube.com/shorts/..."></div><div class="field full"><label>معرض صور إضافي (اختياري — رابط صورة في كل سطر)</label><textarea id="fGallery" placeholder="https://example.com/1.jpg
+https://example.com/2.jpg" style="min-height:80px">${esc(n.gallery || '')}</textarea></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image || 'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image || 'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking ? 'checked' : ''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured ? 'checked' : ''}> ⭐ وضع في الأخبار الرئيسية</label></div><div class="form-actions"><button class="btn" id="saveBtn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="discardDraftAndLeave()">إلغاء</button></div></div></div>`;
   restoreDraftIfAny();
   attachAutosave();
 }
 
+// يضغط أي صورة (تصغير الأبعاد + إعادة ترميز JPEG) قبل تحويلها لنص base64، لتفادي فشل الحفظ مع الصور الكبيرة
+function compressImageFile(file, maxDim, quality, cb) {
+  const img = new Image();
+  const reader = new FileReader();
+  reader.onload = () => {
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        if (width > height) { height = Math.round(height * (maxDim / width)); width = maxDim; }
+        else { width = Math.round(width * (maxDim / height)); height = maxDim; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      cb(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.onerror = () => cb(reader.result); // فشل الضغط؟ استخدم الأصل كما هو
+    img.src = reader.result;
+  };
+  reader.onerror = () => cb(null);
+  reader.readAsDataURL(file);
+}
+
 function previewImage(input) {
   const f = input.files?.[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = () => { $('#fImage').value = r.result; $('#preview').src = r.result; $('#preview').style.display = 'block'; };
-  r.readAsDataURL(f);
+  compressImageFile(f, 1200, 0.82, (dataUrl) => {
+    if (!dataUrl) return;
+    $('#fImage').value = dataUrl; $('#preview').src = dataUrl; $('#preview').style.display = 'block';
+  });
 }
 
 async function saveArticle() {
@@ -155,6 +190,7 @@ async function saveArticle() {
     status: $('#fStatus').value,
     scheduled_at: $('#fSchedule').value ? new Date($('#fSchedule').value).toISOString() : null,
     video_url: $('#fVideoUrl').value.trim(),
+    gallery: $('#fGallery').value.trim(),
     breaking: $('#fBreaking').checked,
     featured: $('#fFeatured').checked,
     reporter: $('#fReporter').value,
@@ -183,6 +219,7 @@ function collectDraftValues() {
     status: $('#fStatus')?.value || '',
     scheduled_at: $('#fSchedule')?.value || '',
     video_url: $('#fVideoUrl')?.value || '',
+    gallery: $('#fGallery')?.value || '',
     reporter: $('#fReporter')?.value || '',
     time_label: $('#fTime')?.value || '',
     breaking: $('#fBreaking')?.checked || false,
@@ -209,6 +246,7 @@ function applyDraftValues(v) {
   if ($('#fStatus')) $('#fStatus').value = v.status || $('#fStatus').value;
   if ($('#fSchedule')) $('#fSchedule').value = v.scheduled_at || '';
   if ($('#fVideoUrl')) $('#fVideoUrl').value = v.video_url || '';
+  if ($('#fGallery')) $('#fGallery').value = v.gallery || '';
   if ($('#fReporter')) $('#fReporter').value = v.reporter || '';
   if ($('#fTime')) $('#fTime').value = v.time_label || '';
   if ($('#fBreaking')) $('#fBreaking').checked = !!v.breaking;
@@ -293,9 +331,10 @@ function reporterForm() {
 
 function previewRepPhoto(input) {
   const f = input.files?.[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = () => { $('#rPhoto').value = r.result; $('#rPreview').src = r.result; $('#rPreview').style.display = 'block'; };
-  r.readAsDataURL(f);
+  compressImageFile(f, 500, 0.85, (dataUrl) => {
+    if (!dataUrl) return;
+    $('#rPhoto').value = dataUrl; $('#rPreview').src = dataUrl; $('#rPreview').style.display = 'block';
+  });
 }
 
 async function saveReporter() {
@@ -337,9 +376,10 @@ function teamForm() {
 
 function previewTeamPhoto(input) {
   const f = input.files?.[0]; if (!f) return;
-  const r = new FileReader();
-  r.onload = () => { $('#tPhoto').value = r.result; $('#tPreview').src = r.result; $('#tPreview').style.display = 'block'; };
-  r.readAsDataURL(f);
+  compressImageFile(f, 500, 0.85, (dataUrl) => {
+    if (!dataUrl) return;
+    $('#tPhoto').value = dataUrl; $('#tPreview').src = dataUrl; $('#tPreview').style.display = 'block';
+  });
 }
 
 async function saveTeamMember() {
@@ -374,3 +414,18 @@ async function delTeamMember(id) {
   await render();
 }
 
+function commentsView() {
+  const c = commentsCache;
+  $('#title').textContent = 'التعليقات';
+  $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>تعليقات الزوار</h2><small>يمكنك حذف أي تعليق غير لائق.</small></div></div><div class="panel">${c.map(x => `<div class="tr rep"><span><b>${esc(x.name)}</b><small class="meta">${esc(x.article_title || 'خبر محذوف')}</small></span><span class="hide">${esc(x.body)}</span><span><button class="actions-btn" onclick="delComment(${x.id})">حذف</button></span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا توجد تعليقات بعد.</p>'}</div></div>`;
+}
+
+async function delComment(id) {
+  if (!confirm('حذف هذا التعليق؟')) return;
+  try {
+    const res = await fetch(`${FN}/comments?id=${id}`, { method: 'DELETE', headers: authHeaders() });
+    if (res.status === 401) { handleAuthExpired(); return; }
+    if (!res.ok) { alert('تعذر الحذف، حاولي مرة أخرى.'); return; }
+  } catch { alert('تعذر الاتصال بالخادم.'); return; }
+  await render();
+}

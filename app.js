@@ -44,7 +44,13 @@ async function getTeam() {
 function render(d, reps) {
   const news = d.filter(n => n.status === 'published').sort((a, b) => Number(b.id) - Number(a.id));
   const breaking = news.filter(n => n.breaking);
-  $('#breaking').textContent = breaking[0]?.title || 'جولة تتابع آخر المستجدات من الميدان';
+  const breakingEl = $('#breaking');
+  if (breaking.length > 1) {
+    const text = breaking.map(n => n.title).join('  •••  ');
+    breakingEl.innerHTML = `<span class="marquee-track">${esc(text)}   •••   ${esc(text)}</span>`;
+  } else {
+    breakingEl.textContent = breaking[0]?.title || 'جولة تتابع آخر المستجدات من الميدان';
+  }
 
   const featured = news.find(n => n.featured) || news[0];
   if (featured) {
@@ -131,5 +137,35 @@ if (darkBtn) {
 }
 applyDarkPref();
 
-load();
+// النشرة البريدية
+const nlForm = $('#newsletterForm');
+if (nlForm) {
+  nlForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('#nlEmail').value.trim();
+    const btn = nlForm.querySelector('button');
+    const oldText = btn.textContent;
+    btn.disabled = true; btn.textContent = 'جاري الاشتراك...';
+    try {
+      const res = await fetch(`${FN}/subscribe`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      if (res.ok) {
+        btn.textContent = 'تم الاشتراك ✓';
+        $('#nlEmail').value = '';
+      } else {
+        btn.textContent = 'حاول مرة أخرى';
+      }
+    } catch {
+      btn.textContent = 'تعذر الاتصال';
+    }
+    setTimeout(() => { btn.disabled = false; btn.textContent = oldText; }, 2500);
+  });
+}
 
+// تسجيل تطبيق الويب التقدمي (PWA)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch(() => {});
+  });
+}
+
+load();

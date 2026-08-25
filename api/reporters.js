@@ -21,8 +21,8 @@ module.exports = async (req, res) => {
     if (method === 'POST') {
       const b = req.body || {};
       const { rows } = await pool.query(
-        `INSERT INTO reporters (name, role, region, active) VALUES ($1,$2,$3,$4) RETURNING *`,
-        [b.name || 'مراسل جديد', b.role || 'مراسل جولة', b.region || '', b.active !== false]
+        `INSERT INTO reporters (name, role, region, active, photo) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [b.name || 'مراسل جديد', b.role || 'مراسل جولة', b.region || '', b.active !== false, b.photo || '']
       );
       return res.status(200).json(rows[0]);
     }
@@ -31,8 +31,8 @@ module.exports = async (req, res) => {
       const b = req.body || {};
       if (!b.id) return res.status(400).json({ error: 'id مطلوب' });
       const { rows } = await pool.query(
-        `UPDATE reporters SET name=$1, role=$2, region=$3, active=$4 WHERE id=$5 RETURNING *`,
-        [b.name, b.role, b.region, b.active !== false, b.id]
+        `UPDATE reporters SET name=$1, role=$2, region=$3, active=$4, photo=$5 WHERE id=$6 RETURNING *`,
+        [b.name, b.role, b.region, b.active !== false, b.photo || '', b.id]
       );
       return res.status(200).json(rows[0]);
     }

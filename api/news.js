@@ -48,6 +48,7 @@ module.exports = async (req, res) => {
     const title = esc(n.title);
     const desc = esc(n.excerpt || (n.body || '').slice(0, 150));
     const yt = extractYouTube(n.video_url);
+    const galleryImages = (n.gallery || '').split('\n').map((s) => s.trim()).filter(Boolean);
 
     const jsonLd = {
       '@context': 'https://schema.org',
@@ -106,6 +107,7 @@ module.exports = async (req, res) => {
 <h1>${title}</h1>
 <div class="meta">${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</div>
 ${yt ? `<div style="position:relative;padding-bottom:${yt.isShort ? '177.7' : '56.25'}%;height:0;overflow:hidden;border-radius:8px;margin-bottom:16px;${yt.isShort ? 'max-width:400px;margin-left:auto;margin-right:auto' : ''}"><iframe src="https://www.youtube.com/embed/${yt.id}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen loading="lazy"></iframe></div>` : `<img src="${esc(image)}" alt="${title}">`}
+${galleryImages.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:16px">${galleryImages.map((g) => `<img src="${esc(g)}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="window.open('${esc(g)}','_blank')">`).join('')}</div>` : ''}
 <div class="body">${esc(n.body || n.excerpt || '')}</div>
 <div class="share-row">
   <a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(n.title)}%20${encodeURIComponent(pageUrl)}">واتساب</a>
@@ -122,6 +124,15 @@ ${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
     </a>`).join('')}
   </div>
 </div>` : ''}
+<div class="comments-wrap" style="margin-top:36px">
+  <h3 style="margin-bottom:14px">التعليقات</h3>
+  <div id="commentsList" style="display:grid;gap:12px;margin-bottom:20px"><p style="opacity:.6;font-size:13px">جاري تحميل التعليقات...</p></div>
+  <form id="commentForm" style="display:grid;gap:8px">
+    <input id="cName" placeholder="اسمك (اختياري)" style="padding:10px;border:1px solid #e6eaf2;border-radius:7px;font-family:inherit">
+    <textarea id="cBody" placeholder="اكتب تعليقك..." required style="padding:10px;border:1px solid #e6eaf2;border-radius:7px;font-family:inherit;min-height:80px;resize:vertical"></textarea>
+    <button type="submit" class="share-btn copy" style="width:fit-content;padding:10px 22px">نشر التعليق</button>
+  </form>
+</div>
 <a class="back" href="/">← العودة لكل الأخبار</a>
 </main>
 <footer style="text-align:center;padding:20px 0"><div class="social-links" style="justify-content:center">
@@ -144,6 +155,33 @@ ${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
     var old=c.textContent; c.textContent='تم النسخ ✓';
     setTimeout(function(){c.textContent=old;},1500);
   };
+
+  var ARTICLE_ID = ${n.id};
+  function escHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }); }
+  function loadComments(){
+    fetch('/api/comments?article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(rows){
+      var list = document.getElementById('commentsList');
+      if(!Array.isArray(rows) || rows.length===0){ list.innerHTML = '<p style="opacity:.6;font-size:13px">لا توجد تعليقات بعد، كن أول من يعلّق.</p>'; return; }
+      list.innerHTML = rows.map(function(c){
+        return '<div style="border:1px solid #e6eaf2;border-radius:8px;padding:12px"><b style="font-size:13px">'+escHtml(c.name)+'</b><p style="font-size:13px;margin:6px 0 0;line-height:1.7">'+escHtml(c.body)+'</p></div>';
+      }).join('');
+    }).catch(function(){});
+  }
+  loadComments();
+  var cf = document.getElementById('commentForm');
+  cf.addEventListener('submit', function(e){
+    e.preventDefault();
+    var btn = cf.querySelector('button');
+    var name = document.getElementById('cName').value.trim();
+    var body = document.getElementById('cBody').value.trim();
+    if(!body) return;
+    btn.disabled = true;
+    fetch('/api/comments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ article_id: ARTICLE_ID, name: name, body: body }) })
+      .then(function(r){ return r.json(); })
+      .then(function(){ document.getElementById('cName').value=''; document.getElementById('cBody').value=''; loadComments(); })
+      .catch(function(){})
+      .finally(function(){ btn.disabled = false; });
+  });
 </script>
 </body>
 </html>`;

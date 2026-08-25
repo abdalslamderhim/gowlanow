@@ -19,6 +19,18 @@
 .social-icon.ig { background: radial-gradient(circle at 30% 110%, #fdf497 0%, #fdf497 5%, #fd5949 45%, #d6249f 60%, #285AEB 90%); }
 .social-icon.tt { background: #000; }
 
+/* ===== شريط الأخبار العاجلة المتحرك ===== */
+#breaking { overflow: hidden; white-space: nowrap; }
+.marquee-track {
+  display: inline-block;
+  padding-right: 100%;
+  animation: gwola-marquee 28s linear infinite;
+}
+@keyframes gwola-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
 /* ===== إصلاح قائمة الجوال المنسدلة (nav.open) — لم تكن معرَّفة أصلًا ===== */
 @media (max-width: 900px) {
   nav.open {

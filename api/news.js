@@ -1,7 +1,9 @@
 const { getPool } = require('../lib/db');
 
 function esc(v = '') {
-  return String(v).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
+  return String(v).replace(/[&<>"']/g, (m) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;'
+  }[m]));
 }
 
 function extractYouTube(url) {
@@ -9,6 +11,16 @@ function extractYouTube(url) {
   const m = String(url).match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([A-Za-z0-9_-]{11})/);
   if (!m) return null;
   return { id: m[1], isShort: /\/shorts\//.test(url) };
+}
+
+function readingMinutes(text = '') {
+  const words = String(text).trim().split(/\s+/).filter(Boolean).length;
+  return Math.max(1, Math.ceil(words / 180));
+}
+
+function safeImage(siteUrl, value) {
+  if (!value) return `${siteUrl}/assets/studio.jpg`;
+  return String(value).startsWith('http') ? String(value) : `${siteUrl}/${String(value).replace(/^\/+/, '')}`;
 }
 
 module.exports = async (req, res) => {
@@ -22,33 +34,47 @@ module.exports = async (req, res) => {
 
   try {
     const { rows } = await pool.query(
-      `SELECT * FROM articles WHERE id = $1 AND (status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now()))`,
+      `SELECT * FROM articles
+       WHERE id = $1
+       AND (status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now()))`,
       [id]
     );
+
     const n = rows[0];
 
     if (!n) {
-      res.status(404).send('<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><title>الخبر غير موجود | جولة</title></head><body><h1>عذرًا، هذا الخبر غير موجود أو غير منشور.</h1><a href="/">العودة للرئيسية</a></body></html>');
+      res.status(404).send(`<!doctype html>
+<html lang="ar" dir="rtl">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>الخبر غير موجود | جولة</title>
+<style>
+body{margin:0;background:#f5f7fb;color:#0b1533;font-family:Arial,sans-serif;display:grid;place-items:center;min-height:100vh}
+.box{width:min(520px,calc(100% - 36px));background:#fff;border:1px solid #e6eaf2;border-radius:20px;padding:30px;box-sizing:border-box}
+a{color:#1238c7;font-weight:800;text-decoration:none}
+</style></head>
+<body><div class="box"><h1>عذرًا، الخبر غير موجود.</h1><p>قد يكون الخبر غير منشور أو تم حذفه.</p><a href="/">العودة إلى جولة ←</a></div></body></html>`);
       return;
     }
 
-    // تسجيل مشاهدة (لا ننتظر النتيجة حتى لا نبطئ عرض الصفحة)
     pool.query('UPDATE articles SET views = COALESCE(views, 0) + 1 WHERE id = $1', [n.id]).catch(() => {});
 
     const { rows: relatedRows } = await pool.query(
-      `SELECT id, title, image, time_label FROM articles
-       WHERE category = $1 AND id <> $2 AND (status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now()))
+      `SELECT id, title, image, category, time_label FROM articles
+       WHERE category = $1 AND id <> $2
+       AND (status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now()))
        ORDER BY id DESC LIMIT 3`,
       [n.category, n.id]
     );
 
     const siteUrl = 'https://gowlanow.vercel.app';
     const pageUrl = `${siteUrl}/news/${n.id}`;
-    const image = n.image && n.image.startsWith('http') ? n.image : `${siteUrl}/${n.image || 'assets/studio.jpg'}`;
+    const image = safeImage(siteUrl, n.image);
     const title = esc(n.title);
-    const desc = esc(n.excerpt || (n.body || '').slice(0, 150));
+    const desc = esc(n.excerpt || (n.body || '').slice(0, 155));
     const yt = extractYouTube(n.video_url);
-    const galleryImages = (n.gallery || '').split('\n').map((s) => s.trim()).filter(Boolean);
+    const bodyText = n.body || n.excerpt || '';
+    const galleryImages = (n.gallery || '').split('\n').map(s => s.trim()).filter(Boolean);
+    const minutes = readingMinutes(bodyText);
 
     const jsonLd = {
       '@context': 'https://schema.org',
@@ -61,17 +87,17 @@ module.exports = async (req, res) => {
       publisher: {
         '@type': 'Organization',
         name: 'جولة',
-        logo: { '@type': 'ImageObject', url: `${siteUrl}/assets/logo.jpg` },
+        logo: { '@type': 'ImageObject', url: `${siteUrl}/assets/logo.jpg` }
       },
       description: n.excerpt || '',
-      mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl },
+      mainEntityOfPage: { '@type': 'WebPage', '@id': pageUrl }
     };
 
     const html = `<!doctype html>
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>${title} | جولة</title>
 <meta name="description" content="${desc}">
 <link rel="canonical" href="${pageUrl}">
@@ -88,158 +114,339 @@ module.exports = async (req, res) => {
 <link rel="alternate" type="application/rss+xml" title="جولة" href="/rss.xml">
 <link rel="stylesheet" href="/styles.css">
 <link rel="stylesheet" href="/dark-mode.css">
-<script type="application/ld+json">${JSON.stringify(jsonLd)}</script>
-<style>
-  .article-wrap{max-width:800px;margin:0 auto;padding:24px 16px}
-  .article-wrap img{width:100%;border-radius:8px;margin-bottom:16px}
-  .article-wrap .meta{color:#666;font-size:14px;margin-bottom:16px}
-  .article-wrap .body{line-height:1.9;font-size:18px;white-space:pre-line}
-  .back{display:inline-block;margin-top:24px;color:#092a9f;text-decoration:none}
-</style>
+<link rel="stylesheet" href="/article-v41.css">
+<script type="application/ld+json">${JSON.stringify(jsonLd).replace(/</g, '\\u003c')}</script>
 </head>
 <body>
-<header><div class="wrap head" style="padding:16px 0;display:flex;align-items:center;justify-content:space-between">
-<a class="brand" href="/"><img src="/assets/logo.jpg" style="height:40px"><strong> جولة</strong></a>
-<button class="darkmode" id="darkModeToggle" aria-label="تبديل الوضع الليلي" title="الوضع الليلي">🌙</button>
-</div></header>
-<main class="article-wrap">
-<span class="story-cat">${esc(n.category || '')}</span>${n.is_live ? ' <span style="background:#e11;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:800">🔴 مباشر</span>' : ''}
-<h1>${title}</h1>
-<div class="meta">${n.reporter ? `<a href="/reporter/${encodeURIComponent(n.reporter)}" style="color:inherit;font-weight:700">${esc(n.reporter)}</a>` : 'جولة'} · ${esc(n.time_label || '')}</div>
-${yt ? `<div style="position:relative;padding-bottom:${yt.isShort ? '177.7' : '56.25'}%;height:0;overflow:hidden;border-radius:8px;margin-bottom:16px;${yt.isShort ? 'max-width:400px;margin-left:auto;margin-right:auto' : ''}"><iframe src="https://www.youtube.com/embed/${yt.id}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen loading="lazy"></iframe></div>` : `<img src="${esc(image)}" alt="${title}">`}
-${galleryImages.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:16px">${galleryImages.map((g) => `<img src="${esc(g)}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="window.open('${esc(g)}','_blank')">`).join('')}</div>` : ''}
-<div class="body">${esc(n.body || n.excerpt || '')}</div>
-<div class="share-row">
-  <a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(n.title)}%20${encodeURIComponent(pageUrl)}">واتساب</a>
-  <a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(n.title)}&url=${encodeURIComponent(pageUrl)}">X</a>
-  <a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}">فيسبوك</a>
-  <a class="share-btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(n.title)}">تيليجرام</a>
-  <button class="share-btn copy" id="copyLink" type="button">نسخ الرابط</button>
-</div>
-${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
-  <h3>أخبار ذات صلة</h3>
-  <div style="display:grid;gap:12px">
-    ${relatedRows.map((r) => `<a href="/news/${r.id}" style="display:flex;gap:10px;align-items:center;text-decoration:none;color:inherit">
-      <img src="${esc(r.image || 'assets/studio.jpg')}" style="width:64px;height:64px;object-fit:cover;border-radius:8px">
-      <span style="font-size:14px;font-weight:700">${esc(r.title)}</span>
-    </a>`).join('')}
-  </div>
-</div>` : ''}
-${n.poll_question ? `<div class="poll-wrap" style="margin-top:32px;border:1px solid #e6eaf2;border-radius:10px;padding:16px">
-  <h3 style="margin-bottom:12px">${esc(n.poll_question)}</h3>
-  <div id="pollOptions"><p style="opacity:.6;font-size:13px">جاري التحميل...</p></div>
-</div>` : ''}
-${n.is_live ? `<div class="live-wrap" style="margin-top:32px">
-  <h3 style="margin-bottom:14px">🔴 آخر التحديثات المباشرة</h3>
-  <div id="liveUpdates"><p style="opacity:.6;font-size:13px">جاري التحميل...</p></div>
-</div>` : ''}
-<div class="comments-wrap" style="margin-top:36px">
-  <h3 style="margin-bottom:14px">التعليقات</h3>
-  <div id="commentsList" style="display:grid;gap:12px;margin-bottom:20px"><p style="opacity:.6;font-size:13px">جاري تحميل التعليقات...</p></div>
-  <form id="commentForm" style="display:grid;gap:8px">
-    <input id="cName" placeholder="اسمك (اختياري)" style="padding:10px;border:1px solid #e6eaf2;border-radius:7px;font-family:inherit">
-    <textarea id="cBody" placeholder="اكتب تعليقك..." required style="padding:10px;border:1px solid #e6eaf2;border-radius:7px;font-family:inherit;min-height:80px;resize:vertical"></textarea>
-    <button type="submit" class="share-btn copy" style="width:fit-content;padding:10px 22px">نشر التعليق</button>
-  </form>
-</div>
-<a class="back" href="/">← العودة لكل الأخبار</a>
-</main>
-<footer style="text-align:center;padding:20px 0"><div class="social-links" style="justify-content:center">
-<a href="https://www.facebook.com/gwola1" target="_blank" rel="noopener" aria-label="فيسبوك" class="social-icon fb"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.462h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.891h-2.33v6.987C18.343 21.128 22 16.991 22 12z"/></svg></a>
-<a href="https://www.instagram.com/gowla_1" target="_blank" rel="noopener" aria-label="انستغرام" class="social-icon ig"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M12 2c2.717 0 3.056.01 4.122.06 1.065.05 1.79.217 2.428.465.66.256 1.216.6 1.772 1.153a4.9 4.9 0 0 1 1.153 1.772c.247.637.415 1.363.465 2.428.05 1.066.06 1.405.06 4.122 0 2.717-.01 3.056-.06 4.122-.05 1.065-.218 1.79-.465 2.428a4.9 4.9 0 0 1-1.153 1.772 4.9 4.9 0 0 1-1.772 1.153c-.637.247-1.363.415-2.428.465-1.066.05-1.405.06-4.122.06-2.717 0-3.056-.01-4.122-.06-1.065-.05-1.79-.218-2.428-.465a4.9 4.9 0 0 1-1.772-1.153 4.9 4.9 0 0 1-1.153-1.772c-.247-.637-.415-1.363-.465-2.428C2.01 15.056 2 14.717 2 12c0-2.717.01-3.056.06-4.122.05-1.066.218-1.79.465-2.428A4.9 4.9 0 0 1 3.678 3.678 4.9 4.9 0 0 1 5.45 2.525c.637-.247 1.363-.415 2.428-.465C8.944 2.01 9.283 2 12 2zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 8.25a3.25 3.25 0 1 1 0-6.5 3.25 3.25 0 0 1 0 6.5zm5.4-8.44a1.17 1.17 0 1 0 0-2.34 1.17 1.17 0 0 0 0 2.34z"/></svg></a>
-<a href="https://www.tiktok.com/@.gowla" target="_blank" rel="noopener" aria-label="تيك توك" class="social-icon tt"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M16.6 5.82c-.9-.98-1.4-2.26-1.4-3.6h-3.28v13.66c0 1.6-1.3 2.9-2.9 2.9-1.6 0-2.9-1.3-2.9-2.9 0-1.6 1.3-2.9 2.9-2.9.28 0 .55.04.8.11V9.8a6.3 6.3 0 0 0-.8-.05 6.16 6.16 0 1 0 6.16 6.16V8.4a9.5 9.5 0 0 0 5.32 1.62V6.74a5.9 5.9 0 0 1-3.9-.92z"/></svg></a>
-</div></footer>
-<script>
-  var b=document.getElementById('darkModeToggle');
-  var saved=localStorage.getItem('gwola-theme')==='dark';
-  if(saved){document.body.classList.add('dark');b.textContent='☀';}
-  b.onclick=function(){
-    var d=document.body.classList.toggle('dark');
-    localStorage.setItem('gwola-theme', d?'dark':'light');
-    b.textContent = d?'☀':'🌙';
-  };
-  var c=document.getElementById('copyLink');
-  c.onclick=function(){
-    navigator.clipboard && navigator.clipboard.writeText(location.href);
-    var old=c.textContent; c.textContent='تم النسخ ✓';
-    setTimeout(function(){c.textContent=old;},1500);
-  };
+<div class="article-v41">
 
-  var ARTICLE_ID = ${n.id};
-  function escHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }); }
-  function loadComments(){
-    fetch('/api/engage?type=comments&article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(rows){
-      var list = document.getElementById('commentsList');
-      if(!Array.isArray(rows) || rows.length===0){ list.innerHTML = '<p style="opacity:.6;font-size:13px">لا توجد تعليقات بعد، كن أول من يعلّق.</p>'; return; }
-      list.innerHTML = rows.map(function(c){
-        return '<div style="border:1px solid #e6eaf2;border-radius:8px;padding:12px"><b style="font-size:13px">'+escHtml(c.name)+'</b><p style="font-size:13px;margin:6px 0 0;line-height:1.7">'+escHtml(c.body)+'</p></div>';
-      }).join('');
-    }).catch(function(){});
+<header class="article-v41-header">
+  <div class="article-v41-nav">
+    <a class="article-v41-brand" href="/">
+      <img src="/assets/logo.jpg" alt="جولة">
+      <span>جولة</span>
+    </a>
+    <div class="article-v41-actions">
+      <a class="article-v41-action" href="/" aria-label="العودة للرئيسية" title="الرئيسية">⌂</a>
+      <button class="article-v41-action" id="darkModeToggle" aria-label="الوضع الليلي" title="الوضع الليلي">🌙</button>
+    </div>
+  </div>
+</header>
+
+<main class="article-v41-wrap">
+
+  <nav class="article-v41-breadcrumb" aria-label="مسار الصفحة">
+    <a href="/">الرئيسية</a>
+    <span>←</span>
+    <span>${esc(n.category || 'أخبار')}</span>
+  </nav>
+
+  <div class="article-v41-kicker">
+    <span class="article-v41-category">${esc(n.category || 'أخبار')}</span>
+    ${n.is_live ? '<span class="article-v41-live"><i></i> مباشر</span>' : ''}
+    ${n.breaking ? '<span class="article-v41-live"><i></i> عاجل</span>' : ''}
+  </div>
+
+  <h1 class="article-v41-title">${title}</h1>
+
+  ${n.excerpt ? `<p class="article-v41-deck">${esc(n.excerpt)}</p>` : ''}
+
+  <div class="article-v41-meta">
+    <span>بواسطة ${n.reporter ? `<a href="/reporter/${encodeURIComponent(n.reporter)}">${esc(n.reporter)}</a>` : '<b>جولة</b>'}</span>
+    <span class="dot"></span>
+    <span>${esc(n.time_label || 'اليوم')}</span>
+    <span class="dot"></span>
+    <span>قراءة ${minutes} دقيقة</span>
+    <span class="dot"></span>
+    <span>${Number(n.views || 0) + 1} مشاهدة</span>
+  </div>
+
+  ${yt
+    ? `<div class="article-v41-video ${yt.isShort ? 'short' : ''}">
+         <iframe src="https://www.youtube.com/embed/${yt.id}" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+       </div>`
+    : `<figure class="article-v41-hero">
+         <img src="${esc(image)}" alt="${title}" fetchpriority="high">
+         <figcaption class="article-v41-hero-caption">صورة الخبر · قناة جولة</figcaption>
+       </figure>`
   }
-  loadComments();
-  var cf = document.getElementById('commentForm');
-  cf.addEventListener('submit', function(e){
-    e.preventDefault();
-    var btn = cf.querySelector('button');
-    var name = document.getElementById('cName').value.trim();
-    var body = document.getElementById('cBody').value.trim();
-    if(!body) return;
-    btn.disabled = true;
-    fetch('/api/engage?type=comments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ article_id: ARTICLE_ID, name: name, body: body }) })
-      .then(function(r){ return r.json(); })
-      .then(function(){ document.getElementById('cName').value=''; document.getElementById('cBody').value=''; loadComments(); })
-      .catch(function(){})
-      .finally(function(){ btn.disabled = false; });
+
+  ${galleryImages.length ? `
+    <div class="article-v41-gallery" aria-label="صور إضافية">
+      ${galleryImages.map(g => `<img src="${esc(safeImage(siteUrl, g))}" alt="" loading="lazy" onclick="window.open('${esc(safeImage(siteUrl, g))}','_blank')">`).join('')}
+    </div>
+  ` : ''}
+
+  <div class="article-v41-content">
+    <div>
+      <article class="article-v41-body">${esc(bodyText)}</article>
+
+      <div class="article-v41-share" aria-label="مشاركة الخبر">
+        <a class="primary" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(n.title)}%20${encodeURIComponent(pageUrl)}">واتساب</a>
+        <a target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(n.title)}">تيليجرام</a>
+        <a target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}">فيسبوك</a>
+        <a target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(n.title)}&url=${encodeURIComponent(pageUrl)}">X</a>
+        <button id="copyLink" type="button">نسخ الرابط</button>
+        <button id="nativeShare" type="button">مشاركة</button>
+      </div>
+
+      ${relatedRows.length ? `
+      <section class="article-v41-section">
+        <div class="article-v41-section-head">
+          <h2>أخبار ذات صلة</h2><span>من جولة</span>
+        </div>
+        <div class="article-v41-related">
+          ${relatedRows.map(r => `
+            <a class="article-v41-related-card" href="/news/${r.id}">
+              <img src="${esc(safeImage(siteUrl, r.image))}" alt="" loading="lazy">
+              <div>
+                <small>${esc(r.category || n.category || 'أخبار')}</small>
+                <strong>${esc(r.title)}</strong>
+              </div>
+            </a>
+          `).join('')}
+        </div>
+      </section>` : ''}
+
+      ${n.poll_question ? `
+      <section class="article-v41-section">
+        <div class="article-v41-section-head">
+          <h3>صوت القراء</h3><span>شارك برأيك</span>
+        </div>
+        <div class="article-v41-panel">
+          <h3 style="margin-top:0">${esc(n.poll_question)}</h3>
+          <div id="pollOptions"><p style="opacity:.6;font-size:13px">جاري التحميل...</p></div>
+        </div>
+      </section>` : ''}
+
+      ${n.is_live ? `
+      <section class="article-v41-section">
+        <div class="article-v41-section-head">
+          <h3>🔴 آخر التحديثات</h3><span>تغطية مباشرة</span>
+        </div>
+        <div class="article-v41-panel" id="liveUpdates"><p style="opacity:.6;font-size:13px">جاري التحميل...</p></div>
+      </section>` : ''}
+
+      <section class="article-v41-section">
+        <div class="article-v41-section-head">
+          <h3>التعليقات</h3><span>شارك باحترام</span>
+        </div>
+        <div class="article-v41-panel">
+          <div id="commentsList" class="article-v41-comment-list"><p style="opacity:.6;font-size:13px">جاري تحميل التعليقات...</p></div>
+          <form id="commentForm" class="article-v41-form">
+            <input id="cName" placeholder="اسمك (اختياري)" maxlength="80">
+            <textarea id="cBody" placeholder="اكتب تعليقك..." required maxlength="2000"></textarea>
+            <button class="article-v41-btn" type="submit">نشر التعليق</button>
+          </form>
+        </div>
+      </section>
+
+      <div class="article-v41-bottom">
+        <a class="article-v41-back" href="/">← العودة إلى الأخبار</a>
+        <span style="color:var(--luxy-muted);font-size:11px">جولة · حيث التغطية والتوثيق</span>
+      </div>
+    </div>
+
+    <aside class="article-v41-side">
+      <div class="article-v41-side-card">
+        <div class="article-v41-side-label">التصنيف</div>
+        <div class="article-v41-side-value">${esc(n.category || 'أخبار')}</div>
+      </div>
+      <div class="article-v41-side-card">
+        <div class="article-v41-side-label">المراسل</div>
+        <div class="article-v41-side-value">${esc(n.reporter || 'جولة')}</div>
+      </div>
+      <div class="article-v41-side-card">
+        <div class="article-v41-side-label">زمن القراءة</div>
+        <div class="article-v41-side-value">${minutes} دقيقة تقريبًا</div>
+      </div>
+      <div class="article-v41-side-card">
+        <div class="article-v41-side-label">رابط الخبر</div>
+        <div class="article-v41-side-value" style="font-size:11px;word-break:break-all">${esc(pageUrl)}</div>
+      </div>
+    </aside>
+  </div>
+</main>
+
+<div class="article-v41-mobile-share">
+  <a class="main" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(n.title)}%20${encodeURIComponent(pageUrl)}">واتساب</a>
+  <button id="mobileCopy" type="button">نسخ</button>
+  <button id="mobileNative" type="button">مشاركة</button>
+</div>
+
+<footer class="article-v41-footer">
+  <div class="article-v41-footer-inner">
+    <strong>جولة | ALGWOLA</strong>
+    <small>حيث التغطية والتوثيق</small>
+  </div>
+</footer>
+
+</div>
+
+<script>
+(function(){
+  var ARTICLE_ID = ${Number(n.id)};
+  var PAGE_URL = ${JSON.stringify(pageUrl)};
+
+  var darkBtn = document.getElementById('darkModeToggle');
+  function applyTheme(){
+    var dark = localStorage.getItem('gwola-theme') === 'dark';
+    document.body.classList.toggle('dark', dark);
+    if(darkBtn) darkBtn.textContent = dark ? '☀' : '🌙';
+  }
+  applyTheme();
+  if(darkBtn){
+    darkBtn.onclick = function(){
+      var dark = document.body.classList.toggle('dark');
+      localStorage.setItem('gwola-theme', dark ? 'dark' : 'light');
+      darkBtn.textContent = dark ? '☀' : '🌙';
+    };
+  }
+
+  function copyLink(button){
+    var done = function(){
+      var old = button.textContent;
+      button.textContent = 'تم النسخ ✓';
+      setTimeout(function(){ button.textContent = old; }, 1500);
+    };
+    if(navigator.clipboard){
+      navigator.clipboard.writeText(PAGE_URL).then(done).catch(function(){});
+    }else{
+      var input=document.createElement('input');
+      input.value=PAGE_URL; document.body.appendChild(input); input.select();
+      try{document.execCommand('copy'); done();}catch(e){}
+      input.remove();
+    }
+  }
+
+  ['copyLink','mobileCopy'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.onclick=function(){copyLink(el);};
   });
 
-  // استطلاع الرأي
-  var pollBox = document.getElementById('pollOptions');
-  if (pollBox) {
-    function loadPoll(){
-      fetch('/api/engage?type=poll&article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(opts){
-        if(!Array.isArray(opts) || !opts.length){ pollBox.innerHTML=''; return; }
-        var voted = localStorage.getItem('gwola-voted-'+ARTICLE_ID);
-        var total = opts.reduce(function(s,o){return s+Number(o.votes||0);},0) || 1;
-        pollBox.innerHTML = opts.map(function(o){
-          var pct = Math.round((Number(o.votes||0)/total)*100);
-          if (voted) {
-            return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+escHtml(o.option_text)+'</span><b>'+pct+'%</b></div><div style="background:#e6eaf2;border-radius:6px;overflow:hidden;height:10px"><div style="background:var(--b,#1439d8);height:100%;width:'+pct+'%"></div></div></div>';
-          }
-          return '<button type="button" class="share-btn copy" style="display:block;width:100%;margin-bottom:8px;text-align:right" onclick="votePoll('+o.id+')">'+escHtml(o.option_text)+'</button>';
+  function nativeShare(){
+    if(navigator.share){
+      navigator.share({
+        title: ${JSON.stringify(n.title)},
+        text: ${JSON.stringify(n.excerpt || '')},
+        url: PAGE_URL
+      }).catch(function(){});
+    }else{
+      var el=document.getElementById('copyLink');
+      if(el) copyLink(el);
+    }
+  }
+
+  ['nativeShare','mobileNative'].forEach(function(id){
+    var el=document.getElementById(id);
+    if(el) el.onclick=nativeShare;
+  });
+
+  function escHtml(s){
+    return String(s).replace(/[&<>"']/g, function(m){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m];
+    });
+  }
+
+  function loadComments(){
+    fetch('/api/engage?type=comments&article_id='+ARTICLE_ID)
+      .then(function(r){return r.json();})
+      .then(function(rows){
+        var list=document.getElementById('commentsList');
+        if(!Array.isArray(rows)||!rows.length){
+          list.innerHTML='<p style="opacity:.6;font-size:13px">لا توجد تعليقات بعد، كن أول من يعلّق.</p>';
+          return;
+        }
+        list.innerHTML=rows.map(function(c){
+          return '<div class="article-v41-comment"><b>'+escHtml(c.name||'زائر')+'</b><p>'+escHtml(c.body||'')+'</p></div>';
         }).join('');
       }).catch(function(){});
+  }
+  loadComments();
+
+  var cf=document.getElementById('commentForm');
+  if(cf){
+    cf.addEventListener('submit',function(e){
+      e.preventDefault();
+      var btn=cf.querySelector('button');
+      var name=document.getElementById('cName').value.trim();
+      var body=document.getElementById('cBody').value.trim();
+      if(!body)return;
+      btn.disabled=true; btn.textContent='جاري النشر...';
+      fetch('/api/engage?type=comments',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({article_id:ARTICLE_ID,name:name,body:body})
+      }).then(function(r){return r.json();})
+       .then(function(){
+         document.getElementById('cName').value='';
+         document.getElementById('cBody').value='';
+         loadComments();
+       }).catch(function(){})
+       .finally(function(){btn.disabled=false;btn.textContent='نشر التعليق';});
+    });
+  }
+
+  var pollBox=document.getElementById('pollOptions');
+  if(pollBox){
+    function loadPoll(){
+      fetch('/api/engage?type=poll&article_id='+ARTICLE_ID)
+        .then(function(r){return r.json();})
+        .then(function(opts){
+          if(!Array.isArray(opts)||!opts.length){pollBox.innerHTML='<p style="opacity:.6;font-size:13px">لا توجد خيارات متاحة.</p>';return;}
+          var voted=localStorage.getItem('gwola-voted-'+ARTICLE_ID);
+          var total=opts.reduce(function(s,o){return s+Number(o.votes||0);},0)||1;
+          pollBox.innerHTML=opts.map(function(o){
+            var pct=Math.round((Number(o.votes||0)/total)*100);
+            if(voted){
+              return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>'+escHtml(o.option_text)+'</span><b>'+pct+'%</b></div><div class="article-v41-progress"><div style="width:'+pct+'%"></div></div></div>';
+            }
+            return '<button type="button" class="article-v41-poll-option" onclick="votePoll('+Number(o.id)+')">'+escHtml(o.option_text)+'</button>';
+          }).join('');
+        }).catch(function(){});
     }
-    window.votePoll = function(optionId){
-      fetch('/api/engage?type=poll', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'vote', option_id: optionId }) })
-        .then(function(){ localStorage.setItem('gwola-voted-'+ARTICLE_ID, '1'); loadPoll(); });
+    window.votePoll=function(optionId){
+      fetch('/api/engage?type=poll',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({action:'vote',option_id:optionId})
+      }).then(function(){
+        localStorage.setItem('gwola-voted-'+ARTICLE_ID,'1');
+        loadPoll();
+      }).catch(function(){});
     };
     loadPoll();
   }
 
-  // التغطية المباشرة
-  var liveBox = document.getElementById('liveUpdates');
-  if (liveBox) {
+  var liveBox=document.getElementById('liveUpdates');
+  if(liveBox){
     function loadLive(){
-      fetch('/api/engage?type=live&article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(rows){
-        if(!Array.isArray(rows) || !rows.length){ liveBox.innerHTML = '<p style="opacity:.6;font-size:13px">لا توجد تحديثات بعد.</p>'; return; }
-        liveBox.innerHTML = rows.map(function(u){
-          var t = new Date(u.created_at);
-          var time = t.getHours().toString().padStart(2,'0')+':'+t.getMinutes().toString().padStart(2,'0');
-          return '<div style="border-right:3px solid #e11;padding:8px 14px;margin-bottom:12px"><small style="opacity:.6">'+time+'</small><p style="margin:4px 0 0;line-height:1.7">'+escHtml(u.body)+'</p></div>';
-        }).join('');
-      }).catch(function(){});
+      fetch('/api/engage?type=live&article_id='+ARTICLE_ID)
+        .then(function(r){return r.json();})
+        .then(function(rows){
+          if(!Array.isArray(rows)||!rows.length){
+            liveBox.innerHTML='<p style="opacity:.6;font-size:13px">لا توجد تحديثات بعد.</p>';
+            return;
+          }
+          liveBox.innerHTML=rows.map(function(u){
+            var t=new Date(u.created_at);
+            var time=String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+            return '<div class="article-v41-live-item"><small>'+time+'</small><p>'+escHtml(u.body||'')+'</p></div>';
+          }).join('');
+        }).catch(function(){});
     }
     loadLive();
-    setInterval(loadLive, 30000);
+    setInterval(loadLive,30000);
   }
+})();
 </script>
 </body>
 </html>`;
 
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate');
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
     res.status(200).send(html);
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).send(`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><title>خطأ | جولة</title><body><h1>تعذر عرض الخبر</h1><p>${esc(err.message)}</p><a href="/">العودة للرئيسية</a></body></html>`);
   }
 };

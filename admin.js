@@ -31,7 +31,7 @@ async function loadArticles() {
 }
 async function loadReporters() {
   try {
-    const res = await fetch(`${FN}/reporters`, { headers: authHeaders() });
+    const res = await fetch(`${FN}/reporter`, { headers: authHeaders() });
     if (res.status === 401) { handleAuthExpired(); return; }
     const rows = await res.json();
     reportersCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
@@ -39,7 +39,7 @@ async function loadReporters() {
 }
 async function loadTeam() {
   try {
-    const res = await fetch(`${FN}/team`, { headers: authHeaders() });
+    const res = await fetch(`${FN}/about`, { headers: authHeaders() });
     if (res.status === 401) { handleAuthExpired(); return; }
     const rows = await res.json();
     teamCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
@@ -47,7 +47,7 @@ async function loadTeam() {
 }
 async function loadComments() {
   try {
-    const res = await fetch(`${FN}/comments`, { headers: authHeaders() });
+    const res = await fetch(`${FN}/engage?type=comments`, { headers: authHeaders() });
     if (res.status === 401) { handleAuthExpired(); return; }
     const rows = await res.json();
     commentsCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];
@@ -109,11 +109,38 @@ async function render() {
 function dashboard() {
   const a = get(); const pub = a.filter(x => x.status === 'published');
   $('#title').textContent = 'نظرة عامة';
-  $('#view').innerHTML = `<div class="content"><div class="notice"><b>V4</b> — غرفة أخبار متصلة بقاعدة بيانات حقيقية. أي خبر تنشرينه يظهر مباشرة لكل زوار الموقع من أي جهاز.</div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x => x.status === 'draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x => x.status === 'scheduled').length}</b><span>مجدول</span></div><div class="stat"><b>${a.filter(x => x.status === 'archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x => x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>الأكثر قراءة</h2></div>${a.slice().sort((x, y) => Number(y.views || 0) - Number(x.views || 0)).slice(0, 5).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا توجد بيانات مشاهدات بعد.</p>'}</div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x, y) => y.id - x.id).slice(0, 8).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`;
+  $('#view').innerHTML = `<div class="content"><div class="notice"><b>V4</b> — غرفة أخبار متصلة بقاعدة بيانات حقيقية. أي خبر تنشرينه يظهر مباشرة لكل زوار الموقع من أي جهاز.<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn" id="sendNewsletterBtn" onclick="sendNewsletterNow()">📧 إرسال النشرة البريدية الآن</button><button class="btn" id="sendPushBtn" onclick="sendPushNow()">🔔 إرسال تنبيه لآخر خبر</button></div></div><div class="stats"><div class="stat"><b>${pub.length}</b><span>منشور</span></div><div class="stat"><b>${a.filter(x => x.status === 'draft').length}</b><span>مسودات</span></div><div class="stat"><b>${a.filter(x => x.status === 'scheduled').length}</b><span>مجدول</span></div><div class="stat"><b>${a.filter(x => x.status === 'archived').length}</b><span>مؤرشف</span></div><div class="stat"><b>${a.filter(x => x.breaking).length}</b><span>عاجل</span></div></div><div class="panel"><div class="panel-title"><h2>الأداء حسب التصنيف (إجمالي المشاهدات)</h2></div>${Object.entries(a.reduce((acc, x) => { acc[x.category] = (acc[x.category] || 0) + Number(x.views || 0); return acc; }, {})).sort((x, y) => y[1] - x[1]).map(([cat, views]) => `<div class="tr"><span>${esc(cat)}</span><span class="hide"></span><span></span><span>${views.toLocaleString('ar')} مشاهدة</span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا توجد بيانات بعد.</p>'}</div><div class="panel"><div class="panel-title"><h2>الأكثر قراءة</h2></div>${a.slice().sort((x, y) => Number(y.views || 0) - Number(x.views || 0)).slice(0, 5).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('') || '<p style="opacity:.7;padding:16px">لا توجد بيانات مشاهدات بعد.</p>'}</div><div class="panel"><div class="panel-title"><h2>آخر المواد</h2><button class="btn" onclick="current='new';editId=null;render()">+ خبر جديد</button></div>${a.slice().sort((x, y) => y.id - x.id).slice(0, 8).map(x => `<div class="tr"><span class="badge ${x.status}">${statusLabel(x.status)}</span><span>${esc(x.title)}</span><span class="hide">${esc(x.category)}</span><span>${Number(x.views || 0).toLocaleString('ar')} مشاهدة</span></div>`).join('')}</div></div>`;
 }
 
-function articles() {
+async function sendNewsletterNow() {
+  if (!confirm('إرسال النشرة البريدية بآخر الأخبار لكل المشتركين الآن؟')) return;
+  const btn = $('#sendNewsletterBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الإرسال...'; }
+  try {
+    const res = await fetch(`${FN}/newsletter?action=send`, { method: 'POST', headers: authHeaders() });
+    const data = await res.json();
+    if (!res.ok) { alert('تعذر الإرسال: ' + (data.error || '')); }
+    else { alert(`تم إرسال النشرة إلى ${data.sent} من ${data.total || 0} مشترك.`); }
+  } catch { alert('تعذر الاتصال بالخادم.'); }
+  if (btn) { btn.disabled = false; btn.textContent = '📧 إرسال النشرة البريدية الآن'; }
+}
+
+async function sendPushNow() {
   const a = get();
+  const latest = a.filter(x => x.status === 'published').sort((x, y) => y.id - x.id)[0];
+  if (!latest) { alert('لا يوجد خبر منشور لإرساله.'); return; }
+  if (!confirm(`إرسال تنبيه للمشتركين عن: "${latest.title}"؟`)) return;
+  const btn = $('#sendPushBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الإرسال...'; }
+  try {
+    const res = await fetch(`${FN}/push?action=send`, {
+      method: 'POST', headers: authHeaders(),
+      body: JSON.stringify({ title: latest.title, body: latest.excerpt || '', url: `/news/${latest.id}` }),
+    });
+    const data = await res.json();
+    if (!res.ok) { alert('تعذر الإرسال: ' + (data.error || '')); }
+    else { alert(`تم إرسال التنبيه إلى ${data.sent} من ${data.total || 0} مشترك.`); }
+  } catch { alert('تعذر الاتصال بالخادم.'); }
+  if (btn) { btn.disabled = false; btn.textContent = '🔔 إرسال تنبيه لآخر خبر'; }
+}
   $('#title').textContent = 'الأخبار';
   $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>إدارة الأخبار</h2><small>${a.length} مادة</small></div><button class="btn red" onclick="current='new';editId=null;render()">+ خبر جديد</button></div><div class="filters"><input id="searchArticles" placeholder="ابحث في العناوين..." oninput="filterArticles()"><select id="filterStatus" onchange="filterArticles()"><option value="">كل الحالات</option><option value="published">منشور</option><option value="draft">مسودة</option><option value="scheduled">مجدول</option><option value="archived">مؤرشف</option></select><select id="filterCat" onchange="filterArticles()"><option value="">كل التصنيفات</option>${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'برامج', 'مجتمع', 'فيديو'].map(c => `<option>${c}</option>`).join('')}</select></div><div id="articleTable" class="table"></div></div>`;
   filterArticles();
@@ -139,13 +166,60 @@ function toLocalInputValue(iso) {
 }
 
 function form() {
-  const n = editId ? get().find(x => x.id === editId) : { title: '', excerpt: '', body: '', status: 'draft', breaking: false, featured: false, category: 'محلي', image: 'assets/studio.jpg', views: 0, time_label: 'الآن', reporter: '', scheduled_at: null, video_url: '', gallery: '' };
+  const n = editId ? get().find(x => x.id === editId) : { title: '', excerpt: '', body: '', status: 'draft', breaking: false, featured: false, category: 'محلي', image: 'assets/studio.jpg', views: 0, time_label: 'الآن', reporter: '', scheduled_at: null, video_url: '', gallery: '', poll_question: '', is_live: false };
   const rs = reps();
   $('#title').textContent = editId ? 'تعديل خبر' : 'خبر جديد';
   $('#view').innerHTML = `<div class="content"><div class="form"><div class="form-head"><div><h2>${editId ? 'تعديل الخبر' : 'إنشاء خبر جديد'}</h2><small>اكتب، ارفع الصورة، ثم اختر حالة النشر.</small></div><span class="live-chip" id="draftChip">غرفة الأخبار</span></div><div class="grid"><div class="field full"><label>عنوان الخبر *</label><input id="fTitle" value="${esc(n.title)}" placeholder="عنوان واضح ومباشر"></div><div class="field"><label>التصنيف</label><select id="fCat">${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'برامج', 'مجتمع', 'فيديو'].map(c => `<option ${n.category === c ? 'selected' : ''}>${c}</option>`).join('')}</select></div><div class="field"><label>الحالة</label><select id="fStatus"><option value="draft" ${n.status === 'draft' ? 'selected' : ''}>مسودة</option><option value="published" ${n.status === 'published' ? 'selected' : ''}>منشور</option><option value="scheduled" ${n.status === 'scheduled' ? 'selected' : ''}>مجدول</option><option value="archived" ${n.status === 'archived' ? 'selected' : ''}>مؤرشف</option></select></div><div class="field"><label>موعد النشر (عند اختيار "مجدول")</label><input id="fSchedule" type="datetime-local" value="${toLocalInputValue(n.scheduled_at)}"></div><div class="field"><label>المراسل</label><select id="fReporter"><option value="">بدون مراسل</option>${rs.map(r => `<option ${n.reporter === r.name ? 'selected' : ''}>${esc(r.name)}</option>`).join('')}</select></div><div class="field"><label>وقت العرض</label><input id="fTime" value="${esc(n.time_label || 'الآن')}" placeholder="الآن / قبل 10 دقائق"></div><div class="field full"><label>الملخص</label><input id="fExcerpt" value="${esc(n.excerpt)}" placeholder="ملخص يظهر في بطاقات الأخبار"></div><div class="field full"><label>رابط فيديو يوتيوب (اختياري — عادي أو Shorts)</label><input id="fVideoUrl" value="${esc(n.video_url || '')}" placeholder="https://www.youtube.com/watch?v=... أو https://youtube.com/shorts/..."></div><div class="field full"><label>معرض صور إضافي (اختياري — رابط صورة في كل سطر)</label><textarea id="fGallery" placeholder="https://example.com/1.jpg
-https://example.com/2.jpg" style="min-height:80px">${esc(n.gallery || '')}</textarea></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image || 'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image || 'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking ? 'checked' : ''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured ? 'checked' : ''}> ⭐ وضع في الأخبار الرئيسية</label></div><div class="form-actions"><button class="btn" id="saveBtn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="discardDraftAndLeave()">إلغاء</button></div></div></div>`;
+https://example.com/2.jpg" style="min-height:80px">${esc(n.gallery || '')}</textarea></div><div class="field full"><label>سؤال استطلاع الرأي (اختياري)</label><input id="fPollQ" value="${esc(n.poll_question || '')}" placeholder="مثال: هل تؤيد هذا القرار؟"></div><div class="field full"><label>خيارات الاستطلاع (سطر لكل خيار)</label><textarea id="fPollOpts" placeholder="نعم
+لا
+لا أعرف" style="min-height:70px"></textarea></div><div class="field full"><label>نص الخبر</label><textarea id="fBody" placeholder="تفاصيل الخبر...">${esc(n.body)}</textarea></div><div class="field full"><label>صورة الغلاف</label><div class="upload"><input id="fImage" value="${esc(n.image || 'assets/studio.jpg')}" placeholder="رابط الصورة أو ارفع من الهاتف"><input id="fFile" type="file" accept="image/*" onchange="previewImage(this)"><img id="preview" src="${esc(n.image || 'assets/studio.jpg')}" onerror="this.style.display='none'"></div><small>يفضَّل رابط صورة خارجي (وليس رفعًا مباشرًا) — الصور المرفوعة كملف تُحوَّل لنص طويل جدًا وقد تفشل مع أحجام كبيرة.</small></div></div><div class="checks"><label><input id="fBreaking" type="checkbox" ${n.breaking ? 'checked' : ''}> 🔴 نشر كخبر عاجل</label><label><input id="fFeatured" type="checkbox" ${n.featured ? 'checked' : ''}> ⭐ وضع في الأخبار الرئيسية</label><label><input id="fIsLive" type="checkbox" ${n.is_live ? 'checked' : ''}> 🔴 تغطية مباشرة (تحديثات لحظية)</label></div><div class="form-actions"><button class="btn" id="saveBtn" onclick="saveArticle()">حفظ الخبر</button><button class="btn ghost" onclick="discardDraftAndLeave()">إلغاء</button></div></div></div>`;
   restoreDraftIfAny();
   attachAutosave();
+  if (editId && n.is_live) loadLiveUpdatesAdmin();
+}
+
+async function loadLiveUpdatesAdmin() {
+  const box = document.createElement('div');
+  box.className = 'panel';
+  box.style.marginTop = '16px';
+  box.innerHTML = `<div class="panel-title"><h2>🔴 تحديثات التغطية المباشرة</h2></div>
+    <div style="padding:14px;display:flex;gap:8px">
+      <input id="liveNewText" placeholder="اكتب تحديثًا جديدًا..." style="flex:1;padding:10px;border:1px solid #e6eaf2;border-radius:7px">
+      <button class="btn" onclick="addLiveUpdate()">إضافة</button>
+    </div>
+    <div id="liveUpdatesAdminList" style="padding:0 14px 14px"></div>`;
+  $('#view').querySelector('.content').appendChild(box);
+  refreshLiveUpdatesAdmin();
+}
+
+async function refreshLiveUpdatesAdmin() {
+  try {
+    const res = await fetch(`${FN}/engage?type=live&article_id=${editId}`, { headers: authHeaders() });
+    const rows = await res.json();
+    const list = $('#liveUpdatesAdminList');
+    if (!list) return;
+    list.innerHTML = Array.isArray(rows) && rows.length
+      ? rows.map(u => `<div class="tr"><span>${esc(u.body)}</span><span></span><span></span><span><button class="actions-btn" onclick="delLiveUpdate(${u.id})">حذف</button></span></div>`).join('')
+      : '<p style="opacity:.7;padding:8px 0">لا توجد تحديثات بعد.</p>';
+  } catch { /* تجاهل */ }
+}
+
+async function addLiveUpdate() {
+  const input = $('#liveNewText');
+  const body = input.value.trim();
+  if (!body) return;
+  try {
+    await fetch(`${FN}/engage?type=live`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ article_id: editId, body }) });
+    input.value = '';
+    refreshLiveUpdatesAdmin();
+  } catch { alert('تعذر الإضافة.'); }
+}
+
+async function delLiveUpdate(id) {
+  try {
+    await fetch(`${FN}/engage?type=live&id=${id}`, { method: 'DELETE', headers: authHeaders() });
+    refreshLiveUpdatesAdmin();
+  } catch { alert('تعذر الحذف.'); }
 }
 
 // يضغط أي صورة (تصغير الأبعاد + إعادة ترميز JPEG) قبل تحويلها لنص base64، لتفادي فشل الحفظ مع الصور الكبيرة
@@ -191,16 +265,30 @@ async function saveArticle() {
     scheduled_at: $('#fSchedule').value ? new Date($('#fSchedule').value).toISOString() : null,
     video_url: $('#fVideoUrl').value.trim(),
     gallery: $('#fGallery').value.trim(),
+    poll_question: $('#fPollQ').value.trim(),
+    is_live: $('#fIsLive').checked,
     breaking: $('#fBreaking').checked,
     featured: $('#fFeatured').checked,
     reporter: $('#fReporter').value,
     time_label: $('#fTime').value.trim() || 'الآن',
   };
   const btn = $('#saveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
+  let savedArticle;
   try {
     const res = await fetch(`${FN}/articles`, { method: editId ? 'PUT' : 'POST', headers: authHeaders(), body: JSON.stringify(item) });
     if (res.status === 401) { handleAuthExpired(); return; }
     if (!res.ok) { alert('تعذر حفظ الخبر، حاولي مرة أخرى.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
+    savedArticle = await res.json();
+  } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
+  const pollOptsRaw = $('#fPollOpts')?.value.trim();
+  if (item.poll_question && pollOptsRaw) {
+    const options = pollOptsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+    if (options.length >= 2) {
+      try {
+        await fetch(`${FN}/engage?type=poll`, { method: 'POST', headers: authHeaders(), body: JSON.stringify({ article_id: savedArticle.id, options }) });
+      } catch { /* الاستطلاع اختياري، لا نوقف الحفظ لأجله */ }
+    }
+  }
   } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
   clearDraftLocal();
   current = 'articles'; editId = null; await render();
@@ -351,7 +439,7 @@ async function saveReporter() {
   };
   const btn = $('#rSaveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
   try {
-    const res = await fetch(`${FN}/reporters`, { method: isNew ? 'POST' : 'PUT', headers: authHeaders(), body: JSON.stringify(item) });
+    const res = await fetch(`${FN}/reporter`, { method: isNew ? 'POST' : 'PUT', headers: authHeaders(), body: JSON.stringify(item) });
     if (res.status === 401) { handleAuthExpired(); return; }
     if (!res.ok) { alert('تعذر الحفظ، حاولي مرة أخرى.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة المراسل' : 'حفظ التعديل'; } return; }
   } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة المراسل' : 'حفظ التعديل'; } return; }
@@ -396,7 +484,7 @@ async function saveTeamMember() {
   };
   const btn = $('#tSaveBtn'); if (btn) { btn.disabled = true; btn.textContent = 'جاري الحفظ...'; }
   try {
-    const res = await fetch(`${FN}/team`, { method: isNew ? 'POST' : 'PUT', headers: authHeaders(), body: JSON.stringify(item) });
+    const res = await fetch(`${FN}/about`, { method: isNew ? 'POST' : 'PUT', headers: authHeaders(), body: JSON.stringify(item) });
     if (res.status === 401) { handleAuthExpired(); return; }
     if (!res.ok) { alert('تعذر الحفظ، حاولي مرة أخرى.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة العضو' : 'حفظ التعديل'; } return; }
   } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = isNew ? 'إضافة العضو' : 'حفظ التعديل'; } return; }
@@ -407,7 +495,7 @@ async function saveTeamMember() {
 async function delTeamMember(id) {
   if (!confirm('حذف هذا العضو من الفريق؟')) return;
   try {
-    const res = await fetch(`${FN}/team?id=${id}`, { method: 'DELETE', headers: authHeaders() });
+    const res = await fetch(`${FN}/about?id=${id}`, { method: 'DELETE', headers: authHeaders() });
     if (res.status === 401) { handleAuthExpired(); return; }
     if (!res.ok) { alert('تعذر الحذف، حاولي مرة أخرى.'); return; }
   } catch { alert('تعذر الاتصال بالخادم.'); return; }
@@ -423,7 +511,7 @@ function commentsView() {
 async function delComment(id) {
   if (!confirm('حذف هذا التعليق؟')) return;
   try {
-    const res = await fetch(`${FN}/comments?id=${id}`, { method: 'DELETE', headers: authHeaders() });
+    const res = await fetch(`${FN}/engage?type=comments&id=${id}`, { method: 'DELETE', headers: authHeaders() });
     if (res.status === 401) { handleAuthExpired(); return; }
     if (!res.ok) { alert('تعذر الحذف، حاولي مرة أخرى.'); return; }
   } catch { alert('تعذر الاتصال بالخادم.'); return; }

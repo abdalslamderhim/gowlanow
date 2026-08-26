@@ -103,9 +103,9 @@ module.exports = async (req, res) => {
 <button class="darkmode" id="darkModeToggle" aria-label="تبديل الوضع الليلي" title="الوضع الليلي">🌙</button>
 </div></header>
 <main class="article-wrap">
-<span class="story-cat">${esc(n.category || '')}</span>
+<span class="story-cat">${esc(n.category || '')}</span>${n.is_live ? ' <span style="background:#e11;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;font-weight:800">🔴 مباشر</span>' : ''}
 <h1>${title}</h1>
-<div class="meta">${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</div>
+<div class="meta">${n.reporter ? `<a href="/reporter/${encodeURIComponent(n.reporter)}" style="color:inherit;font-weight:700">${esc(n.reporter)}</a>` : 'جولة'} · ${esc(n.time_label || '')}</div>
 ${yt ? `<div style="position:relative;padding-bottom:${yt.isShort ? '177.7' : '56.25'}%;height:0;overflow:hidden;border-radius:8px;margin-bottom:16px;${yt.isShort ? 'max-width:400px;margin-left:auto;margin-right:auto' : ''}"><iframe src="https://www.youtube.com/embed/${yt.id}" style="position:absolute;top:0;left:0;width:100%;height:100%;border:0" allow="accelerometer;autoplay;clipboard-write;encrypted-media;gyroscope;picture-in-picture" allowfullscreen loading="lazy"></iframe></div>` : `<img src="${esc(image)}" alt="${title}">`}
 ${galleryImages.length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;margin-bottom:16px">${galleryImages.map((g) => `<img src="${esc(g)}" style="width:100%;height:110px;object-fit:cover;border-radius:8px;cursor:pointer" onclick="window.open('${esc(g)}','_blank')">`).join('')}</div>` : ''}
 <div class="body">${esc(n.body || n.excerpt || '')}</div>
@@ -113,6 +113,7 @@ ${galleryImages.length ? `<div style="display:grid;grid-template-columns:repeat(
   <a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent(n.title)}%20${encodeURIComponent(pageUrl)}">واتساب</a>
   <a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent(n.title)}&url=${encodeURIComponent(pageUrl)}">X</a>
   <a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(pageUrl)}">فيسبوك</a>
+  <a class="share-btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(pageUrl)}&text=${encodeURIComponent(n.title)}">تيليجرام</a>
   <button class="share-btn copy" id="copyLink" type="button">نسخ الرابط</button>
 </div>
 ${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
@@ -123,6 +124,14 @@ ${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
       <span style="font-size:14px;font-weight:700">${esc(r.title)}</span>
     </a>`).join('')}
   </div>
+</div>` : ''}
+${n.poll_question ? `<div class="poll-wrap" style="margin-top:32px;border:1px solid #e6eaf2;border-radius:10px;padding:16px">
+  <h3 style="margin-bottom:12px">${esc(n.poll_question)}</h3>
+  <div id="pollOptions"><p style="opacity:.6;font-size:13px">جاري التحميل...</p></div>
+</div>` : ''}
+${n.is_live ? `<div class="live-wrap" style="margin-top:32px">
+  <h3 style="margin-bottom:14px">🔴 آخر التحديثات المباشرة</h3>
+  <div id="liveUpdates"><p style="opacity:.6;font-size:13px">جاري التحميل...</p></div>
 </div>` : ''}
 <div class="comments-wrap" style="margin-top:36px">
   <h3 style="margin-bottom:14px">التعليقات</h3>
@@ -159,7 +168,7 @@ ${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
   var ARTICLE_ID = ${n.id};
   function escHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]; }); }
   function loadComments(){
-    fetch('/api/comments?article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(rows){
+    fetch('/api/engage?type=comments&article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(rows){
       var list = document.getElementById('commentsList');
       if(!Array.isArray(rows) || rows.length===0){ list.innerHTML = '<p style="opacity:.6;font-size:13px">لا توجد تعليقات بعد، كن أول من يعلّق.</p>'; return; }
       list.innerHTML = rows.map(function(c){
@@ -176,12 +185,53 @@ ${relatedRows.length ? `<div class="related-wrap" style="margin-top:32px">
     var body = document.getElementById('cBody').value.trim();
     if(!body) return;
     btn.disabled = true;
-    fetch('/api/comments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ article_id: ARTICLE_ID, name: name, body: body }) })
+    fetch('/api/engage?type=comments', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ article_id: ARTICLE_ID, name: name, body: body }) })
       .then(function(r){ return r.json(); })
       .then(function(){ document.getElementById('cName').value=''; document.getElementById('cBody').value=''; loadComments(); })
       .catch(function(){})
       .finally(function(){ btn.disabled = false; });
   });
+
+  // استطلاع الرأي
+  var pollBox = document.getElementById('pollOptions');
+  if (pollBox) {
+    function loadPoll(){
+      fetch('/api/engage?type=poll&article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(opts){
+        if(!Array.isArray(opts) || !opts.length){ pollBox.innerHTML=''; return; }
+        var voted = localStorage.getItem('gwola-voted-'+ARTICLE_ID);
+        var total = opts.reduce(function(s,o){return s+Number(o.votes||0);},0) || 1;
+        pollBox.innerHTML = opts.map(function(o){
+          var pct = Math.round((Number(o.votes||0)/total)*100);
+          if (voted) {
+            return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:4px"><span>'+escHtml(o.option_text)+'</span><b>'+pct+'%</b></div><div style="background:#e6eaf2;border-radius:6px;overflow:hidden;height:10px"><div style="background:var(--b,#1439d8);height:100%;width:'+pct+'%"></div></div></div>';
+          }
+          return '<button type="button" class="share-btn copy" style="display:block;width:100%;margin-bottom:8px;text-align:right" onclick="votePoll('+o.id+')">'+escHtml(o.option_text)+'</button>';
+        }).join('');
+      }).catch(function(){});
+    }
+    window.votePoll = function(optionId){
+      fetch('/api/engage?type=poll', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ action:'vote', option_id: optionId }) })
+        .then(function(){ localStorage.setItem('gwola-voted-'+ARTICLE_ID, '1'); loadPoll(); });
+    };
+    loadPoll();
+  }
+
+  // التغطية المباشرة
+  var liveBox = document.getElementById('liveUpdates');
+  if (liveBox) {
+    function loadLive(){
+      fetch('/api/engage?type=live&article_id='+ARTICLE_ID).then(function(r){return r.json();}).then(function(rows){
+        if(!Array.isArray(rows) || !rows.length){ liveBox.innerHTML = '<p style="opacity:.6;font-size:13px">لا توجد تحديثات بعد.</p>'; return; }
+        liveBox.innerHTML = rows.map(function(u){
+          var t = new Date(u.created_at);
+          var time = t.getHours().toString().padStart(2,'0')+':'+t.getMinutes().toString().padStart(2,'0');
+          return '<div style="border-right:3px solid #e11;padding:8px 14px;margin-bottom:12px"><small style="opacity:.6">'+time+'</small><p style="margin:4px 0 0;line-height:1.7">'+escHtml(u.body)+'</p></div>';
+        }).join('');
+      }).catch(function(){});
+    }
+    loadLive();
+    setInterval(loadLive, 30000);
+  }
 </script>
 </body>
 </html>`;

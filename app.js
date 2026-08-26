@@ -21,7 +21,7 @@ async function getNews() {
 
 async function getReporters() {
   try {
-    const res = await fetch(`${FN}/reporters`);
+    const res = await fetch(`${FN}/reporter`);
     if (!res.ok) throw new Error('bad response');
     const rows = await res.json();
     return Array.isArray(rows) && rows.length ? rows : [];
@@ -30,21 +30,27 @@ async function getReporters() {
   }
 }
 
-async function getPrograms() {
+async function getTeam() {
   try {
-    const res = await fetch(`${FN}/programs`);
+    const res = await fetch(`${FN}/about?list=team`);
     if (!res.ok) throw new Error('bad response');
     const rows = await res.json();
-    return Array.isArray(rows) && rows.length ? rows : [];
+    return Array.isArray(rows) ? rows : [];
   } catch {
     return [];
   }
 }
 
-function render(d, reps, programs) {
+function render(d, reps) {
   const news = d.filter(n => n.status === 'published').sort((a, b) => Number(b.id) - Number(a.id));
   const breaking = news.filter(n => n.breaking);
-  $('#breaking').textContent = breaking[0]?.title || 'جولة تتابع آخر المستجدات من الميدان';
+  const breakingEl = $('#breaking');
+  if (breaking.length > 1) {
+    const text = breaking.map(n => n.title).join('  •••  ');
+    breakingEl.innerHTML = `<span class="marquee-track">${esc(text)}   •••   ${esc(text)}</span>`;
+  } else {
+    breakingEl.textContent = breaking[0]?.title || 'جولة تتابع آخر المستجدات من الميدان';
+  }
 
   const featured = news.find(n => n.featured) || news[0];
   if (featured) {
@@ -62,57 +68,137 @@ function render(d, reps, programs) {
   $('#coverageGrid').innerHTML = cov.map(n => `<article class="card" onclick="openStory(${n.id})"><div class="card-img" style="background-image:url('${esc(n.image || 'assets/studio.jpg')}')"></div><div class="card-body"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</p></div></article>`).join('');
 
   const reports = news.filter(n => n.category === 'تقارير').slice(0, 3);
-  if (reports.length) {
-    $('#reportsGrid').innerHTML = reports.map(n => `<article onclick="openStory(${n.id})"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.excerpt || '')}</p></article>`).join('');
+  $('#reportsGrid').innerHTML = reports.length
+    ? reports.map(n => `<article onclick="openStory(${n.id})"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3><p>${esc(n.excerpt || '')}</p></article>`).join('')
+    : `<p style="color:inherit;opacity:.7">لا توجد تقارير منشورة حاليًا.</p>`;
+
+  const docs = news.filter(n => n.category === 'توثيق').slice(0, 3);
+  if (docs.length) {
+    const [main, ...sideDocs] = docs;
+    $('#docGrid').innerHTML = `<article onclick="openStory(${main.id})"><span>${esc(main.category)}</span><h2>${esc(main.title)}</h2><p>${esc(main.excerpt || '')}</p></article><div>${sideDocs.map(n => `<article onclick="openStory(${n.id})"><span>${esc(n.category)}</span><h3>${esc(n.title)}</h3></article>`).join('')}</div>`;
+  } else {
+    $('#docGrid').innerHTML = `<p style="opacity:.7">لا توجد مواد توثيقية منشورة حاليًا.</p>`;
   }
 
-  const activePrograms = programs.length ? programs : [{ title: 'صوت المجتمع', description: 'برنامج اجتماعي يضع الإنسان في قلب القصة.' }, { title: 'من الميدان', description: 'حوار وتغطية مباشرة من موقع الحدث.' }, { title: 'ذاكرة المكان', description: 'توثيق للقصص والأماكن والشهادات.' }];
-  $('#programsGrid').innerHTML = activePrograms.map(p => `<article class="program"><i>${esc((p.title || '?').slice(0, 1))}</i><div><h3>${esc(p.title)}</h3><p>${esc(p.description || '')}</p></div></article>`).join('');
+  const programsList = news.filter(n => n.category === 'برامج').slice(0, 3);
+  $('#programsGrid').innerHTML = programsList.length
+    ? programsList.map(n => `<article class="program" onclick="openStory(${n.id})"><i>${esc((n.title || '؟').slice(0, 1))}</i><div><h3>${esc(n.title)}</h3><p>${esc(n.excerpt || '')}</p></div></article>`).join('')
+    : `<p style="opacity:.7">لا توجد برامج منشورة حاليًا.</p>`;
 
   let vids = news.filter(n => n.category === 'فيديو');
   if (vids.length < 4) { vids = vids.concat(news.filter(n => n.category !== 'فيديو')).slice(0, 4); } else { vids = vids.slice(0, 4); }
-  $('#videosGrid').innerHTML = vids.map(n => `<article class="video" onclick="openStory(${n.id})"><div class="thumb" style="background-image:url('${esc(n.image || 'assets/studio.jpg')}')"><button class="play" onclick="event.stopPropagation();openStory(${n.id})">▶</button></div><h3>${esc(n.title)}</h3><span>${esc(n.category)}</span></article>`).join('');
+  $('#videosGrid').innerHTML = vids.map(n => `<article class="video" onclick="openStory(${n.id})"><div class="thumb" style="background-image:url('${esc(n.image || 'assets/studio.jpg')}')"><button class="play" onclick="event.stopPropagation();openStory(${n.id})">▶</button>${n.video_url ? '<span style="position:absolute;top:8px;left:8px;background:#e11;color:#fff;font-size:10px;padding:2px 6px;border-radius:4px">فيديو</span>' : ''}</div><h3>${esc(n.title)}</h3><span>${esc(n.category)}</span></article>`).join('');
 
   const activeReps = reps.length ? reps : [{ name: 'أحمد محمد', role: 'مراسل ميداني', region: 'الوسط' }, { name: 'محمد عمر', role: 'مراسل جولة', region: 'الشرق' }];
-  $('#reportersGrid').innerHTML = activeReps.map(p => `<article class="person"><div class="avatar">${esc(p.name.slice(0, 1))}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><span>${esc(p.region)}</span></article>`).join('');
+  $('#reportersGrid').innerHTML = activeReps.map(p => `<article class="person"><div class="avatar" style="${p.photo ? 'padding:0;overflow:hidden' : ''}">${p.photo ? `<img src="${esc(p.photo)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : esc(p.name.slice(0, 1))}</div><h3>${esc(p.name)}</h3><p>${esc(p.role)}</p><span>${esc(p.region)}</span></article>`).join('');
 }
 
 let allNews = [];
+
 function openStory(id) {
-  const n = allNews.find(x => x.id === id); if (!n) return;
-  const modal = $('#modal'); modal.classList.add('open');
-  const box = modal.querySelector('.modal-box');
-  const shareUrl = `${location.origin}/article/${n.id}`;
-  box.innerHTML = `<button id="closeStory">×</button><img class="story-image" src="${esc(n.image || 'assets/studio.jpg')}" alt=""><span class="story-cat">${esc(n.category)}</span><h2>${esc(n.title)}</h2><small>${esc(n.reporter || 'جولة')} · ${esc(n.time_label || '')}</small><p class="story-body">${esc(n.body || n.excerpt || '')}</p><div class="share-row"><button id="shareNativeBtn" type="button">📤 مشاركة</button><a href="https://wa.me/?text=${encodeURIComponent(n.title + ' - ' + shareUrl)}" target="_blank" rel="noopener">واتساب</a><a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(n.title)}&url=${encodeURIComponent(shareUrl)}" target="_blank" rel="noopener">تويتر</a></div>`;
-  $('#closeStory').onclick = () => modal.classList.remove('open');
-  const shareBtn = $('#shareNativeBtn');
-  if (shareBtn) shareBtn.onclick = async () => {
-    if (navigator.share) {
-      try { await navigator.share({ title: n.title, text: n.excerpt || '', url: shareUrl }); } catch { /* user cancelled */ }
-    } else {
-      try { await navigator.clipboard.writeText(shareUrl); alert('تم نسخ رابط الخبر'); } catch { prompt('انسخي رابط الخبر:', shareUrl); }
-    }
-  };
+  location.href = `/news/${id}`;
 }
 
 async function load() {
-  const [news, reps, programs] = await Promise.all([getNews(), getReporters(), getPrograms()]);
+  const [news, reps, team] = await Promise.all([getNews(), getReporters(), getTeam()]);
   allNews = news.map(n => ({ ...n, id: Number(n.id) }));
-  render(allNews, reps, programs);
-  const params = new URLSearchParams(location.search);
-  const articleId = Number(params.get('article'));
-  if (articleId && allNews.some(n => n.id === articleId)) {
-    openStory(articleId);
+  render(allNews, reps);
+  const teamGrid = $('#teamGrid');
+  if (teamGrid) {
+    teamGrid.innerHTML = team.length
+      ? team.map(m => `<div class="team-card"><img src="${esc(m.photo || 'assets/studio.jpg')}" alt="${esc(m.name)}"><h3>${esc(m.name)}</h3><span>${esc(m.role || '')}</span>${m.bio ? `<p>${esc(m.bio)}</p>` : ''}</div>`).join('')
+      : `<p style="opacity:.7">لم تتم إضافة أعضاء الفريق بعد.</p>`;
   }
 }
 
 $('#search').onclick = () => { $('#modal').classList.add('open'); $('#q').focus(); };
 $('#close').onclick = () => $('#modal').classList.remove('open');
+let searchDebounce = null;
 $('#q').oninput = e => {
-  const q = e.target.value.trim().toLowerCase();
-  const results = allNews.filter(n => n.status === 'published' && (n.title + n.excerpt + n.category).toLowerCase().includes(q)).slice(0, 10);
-  $('#results').innerHTML = q ? (results.map(r => `<div class="result"><b>${esc(r.title)}</b><small>${esc(r.category)} · ${esc(r.time_label || '')}</small></div>`).join('') || '<p>لا توجد نتائج.</p>') : '';
+  const q = e.target.value.trim();
+  clearTimeout(searchDebounce);
+  if (!q) { $('#results').innerHTML = ''; return; }
+  $('#results').innerHTML = '<p style="opacity:.6">جاري البحث...</p>';
+  searchDebounce = setTimeout(async () => {
+    try {
+      const res = await fetch(`${FN}/articles?q=${encodeURIComponent(q)}`);
+      const results = await res.json();
+      $('#results').innerHTML = Array.isArray(results) && results.length
+        ? results.map(r => `<div class="result" onclick="location.href='/news/${r.id}'" style="cursor:pointer"><b>${esc(r.title)}</b><small>${esc(r.category)} · ${esc(r.time_label || '')}</small></div>`).join('')
+        : '<p>لا توجد نتائج.</p>';
+    } catch {
+      $('#results').innerHTML = '<p>تعذر البحث، حاول مرة أخرى.</p>';
+    }
+  }, 350);
 };
 $('#menu').onclick = () => $('#nav').classList.toggle('open');
 
+// الوضع الليلي
+const darkBtn = $('#darkModeToggle');
+function applyDarkPref() {
+  const saved = localStorage.getItem('gwola-theme');
+  const isDark = saved === 'dark';
+  document.body.classList.toggle('dark', isDark);
+  if (darkBtn) darkBtn.textContent = isDark ? '☀' : '🌙';
+}
+if (darkBtn) {
+  darkBtn.onclick = () => {
+    const isDark = document.body.classList.toggle('dark');
+    localStorage.setItem('gwola-theme', isDark ? 'dark' : 'light');
+    darkBtn.textContent = isDark ? '☀' : '🌙';
+  };
+}
+applyDarkPref();
+
+// النشرة البريدية
+const nlForm = $('#newsletterForm');
+if (nlForm) {
+  nlForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('#nlEmail').value.trim();
+    const btn = nlForm.querySelector('button');
+    const oldText = btn.textContent;
+    btn.disabled = true; btn.textContent = 'جاري الاشتراك...';
+    try {
+      const res = await fetch(`${FN}/newsletter`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) });
+      if (res.ok) {
+        btn.textContent = 'تم الاشتراك ✓';
+        $('#nlEmail').value = '';
+      } else {
+        btn.textContent = 'حاول مرة أخرى';
+      }
+    } catch {
+      btn.textContent = 'تعذر الاتصال';
+    }
+    setTimeout(() => { btn.disabled = false; btn.textContent = oldText; }, 2500);
+  });
+}
+
+// تسجيل تطبيق الويب التقدمي (PWA) + تنبيهات المتصفح
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').then(async (reg) => {
+      const btn = $('#notifyBtn');
+      if (!btn) return;
+      if (Notification.permission === 'granted') { btn.style.display = 'none'; return; }
+      btn.style.display = 'inline-flex';
+      btn.onclick = async () => {
+        try {
+          const perm = await Notification.requestPermission();
+          if (perm !== 'granted') return;
+          const vapidRes = await fetch(`${FN}/push?action=vapid-key`);
+          const { publicKey } = await vapidRes.json();
+          const sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: publicKey,
+          });
+          await fetch(`${FN}/push`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sub) });
+          btn.style.display = 'none';
+        } catch { /* المستخدم رفض أو المتصفح لا يدعم */ }
+      };
+    }).catch(() => {});
+  });
+}
+
 load();
+

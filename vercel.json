@@ -1,13 +1,13 @@
-
+{
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
       "source": "/news/:id",
-      "destination": "/api/news?id=:id"
+      "destination": "/api/news"
     },
     {
       "source": "/article/:id",
-      "destination": "/api/news?id=:id"
+      "destination": "/api/news"
     }
   ]
 }

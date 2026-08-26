@@ -7,6 +7,20 @@ module.exports = async (req, res) => {
   const qs = req.query || {};
 
   try {
+    // ---- بحث عام (بدون توثيق) ----
+    if (method === 'GET' && qs.q) {
+      const q = String(qs.q).trim();
+      if (q.length < 2) return res.status(200).json([]);
+      const { rows } = await pool.query(
+        `SELECT id, title, category, excerpt, image, time_label FROM articles
+         WHERE (status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now()))
+         AND (title ILIKE $1 OR excerpt ILIKE $1 OR body ILIKE $1)
+         ORDER BY id DESC LIMIT 20`,
+        [`%${q}%`]
+      );
+      return res.status(200).json(rows);
+    }
+
     // ---- القراءة: عامة للزوار (منشور، أو مجدول وحان وقته)، أو كاملة إذا كانت الهوية موثّقة ----
     if (method === 'GET') {
       const authed = isAuthed(req);

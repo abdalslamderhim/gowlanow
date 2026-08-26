@@ -1,45 +1,125 @@
 <!doctype html>
 <html lang="ar" dir="rtl">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#092a9f">
-<meta name="description" content="جولة | حيث التغطية والتوثيق">
-<title>جولة | حيث التغطية والتوثيق</title>
-<link rel="alternate" type="application/rss+xml" title="جولة" href="/rss.xml">
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#1439d8">
-<link rel="apple-touch-icon" href="/assets/logo.jpg">
-<link rel="stylesheet" href="styles.css">
-<link rel="stylesheet" href="dark-mode.css">
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#f5f7fb">
+  <title>جولة | الأخبار من قلب الحدث</title>
+  <meta name="description" content="جولة — منصة إخبارية سودانية بتجربة هادئة وفاخرة.">
+  <link rel="icon" href="/assets/logo.jpg">
+  <link rel="stylesheet" href="/home-v41.css">
 </head>
 <body>
-<div class="topline"></div>
-<div class="breaking"><div class="wrap breaking-in"><span class="live"></span><b>عاجل</b><div id="breaking">جاري تحميل آخر الأخبار...</div><a href="#latest">كل الأخبار ←</a></div></div>
-<header><div class="wrap head">
-<button class="menu" id="menu">☰</button>
-<a class="brand" href="/"><img src="assets/logo.jpg"><div><strong>جولة</strong><small>حيث التغطية والتوثيق</small></div></a>
-<nav id="nav"><a href="#latest">الأخبار</a><a href="#coverage">التغطيات</a><a href="#documentation">التوثيق</a><a href="#reports">التقارير</a><a href="#programs">البرامج</a><a href="#videos">فيديو</a><a href="#reporters">المراسلون</a></nav>
-<button class="darkmode" id="darkModeToggle" aria-label="تبديل الوضع الليلي" title="الوضع الليلي">🌙</button>
-<button class="search" id="search">⌕</button></div></header>
-<main>
-<section class="hero"><div class="wrap hero-grid"><article class="hero-main"><img src="assets/studio.jpg"><div class="shade"></div><div class="hero-copy"><span>منصة جولة</span><h1>حيث التغطية والتوثيق</h1><p>خبر من الميدان، صورة تحفظ الذاكرة، وتقرير يضع الحدث في سياقه.</p><a class="cta" href="#latest">ابدأ الجولة ←</a></div></article><aside class="hero-list"><div class="sect-head"><h2>أهم الأخبار</h2><a href="#latest">عرض الكل</a></div><div id="top"></div></aside></div></section>
-<section class="metrics"><div class="wrap metrics-in"><div><b>24/7</b><span>غرفة أخبار</span></div><div><b>الميدان</b><span>تغطية مباشرة</span></div><div><b>الصورة</b><span>توثيق أصيل</span></div><div><b>الإنسان</b><span>قصص المجتمع</span></div></div></section>
-<section class="section" id="latest"><div class="wrap"><div class="sect-head"><div><small>تحديث مستمر</small><h2>آخر الأخبار</h2></div><a href="#archive">الأرشيف ←</a></div><div class="latest"><div id="news"></div><aside class="popular"><h3>الأكثر قراءة</h3><div id="popular"></div></aside></div></div></section>
-<section class="section soft" id="coverage"><div class="wrap"><div class="sect-head"><div><small>من قلب الحدث</small><h2>تغطيات جولة</h2></div></div><div class="cards" id="coverageGrid"></div></div></section>
-<section class="section" id="documentation"><div class="wrap"><div class="sect-head"><div><small>الصورة تحفظ الذاكرة</small><h2>التوثيق</h2></div></div><div class="doc" id="docGrid"></div></div></section>
-<section class="section dark" id="reports"><div class="wrap"><div class="sect-head light"><div><small>فهم أعمق</small><h2>تقارير وتحقيقات</h2></div></div><div class="report-grid" id="reportsGrid"></div></div></section>
-<section class="section" id="programs"><div class="wrap"><div class="sect-head"><div><small>صوت المجتمع</small><h2>برامج جولة</h2></div></div><div class="programs" id="programsGrid"></div></div></section>
-<section class="section soft" id="videos"><div class="wrap"><div class="sect-head"><div><small>جولة فيديو</small><h2>مركز الفيديو</h2></div></div><div class="videos" id="videosGrid"></div></div></section>
-<section class="section" id="reporters"><div class="wrap"><div class="sect-head"><div><small>شبكة الميدان</small><h2>مراسلو جولة</h2></div></div><div class="people" id="reportersGrid"></div></div></section>
-<section class="newsletter"><div class="wrap"><div><small>نشرة جولة</small><h2>أهم الأخبار إلى بريدك</h2></div><form id="newsletterForm"><input id="nlEmail" type="email" placeholder="بريدك الإلكتروني" required><button type="submit">اشتراك</button></form></div></section>
-</main>
-<section class="section" id="about"><div class="wrap"><div class="sect-head"><div><small>تعرف علينا</small><h2>من نحن</h2></div><a href="/about">صفحة كاملة ←</a></div><p style="max-width:640px;line-height:1.9;margin-bottom:20px">قناة جولة — حيث التغطية والتوثيق. صوت العودة وحكايات المكان. تهدف القناة إلى توثيق وسرد وإحياء قصص العودة إلى الوطن؛ عبر حلقات ميدانية، لقاءات مع العائلات والناشطين، وتقارير ثقافية.</p><div class="team-grid" id="teamGrid"></div></div></section>
-<footer><div class="wrap"><img src="assets/logo.jpg"><h3>جولة</h3><p>حيث التغطية والتوثيق</p><div class="links"><a href="#latest">الأخبار</a><a href="#coverage">التغطيات</a><a href="#videos">الفيديو</a><a href="/about">من نحن</a><a href="/admin.html">غرفة الأخبار</a></div><div class="social-links">
-<a href="https://www.facebook.com/gwola1" target="_blank" rel="noopener" aria-label="فيسبوك" class="social-icon fb"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M22 12c0-5.523-4.477-10-10-10S2 6.477 2 12c0 4.991 3.657 9.128 8.438 9.878v-6.987h-2.54V12h2.54V9.797c0-2.506 1.492-3.89 3.777-3.89 1.094 0 2.238.195 2.238.195v2.462h-1.26c-1.243 0-1.63.771-1.63 1.562V12h2.773l-.443 2.891h-2.33v6.987C18.343 21.128 22 16.991 22 12z"/></svg></a>
-<a href="https://www.instagram.com/gowla_1" target="_blank" rel="noopener" aria-label="انستغرام" class="social-icon ig"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2c2.717 0 3.056.01 4.122.06 1.065.05 1.79.217 2.428.465.66.256 1.216.6 1.772 1.153a4.9 4.9 0 0 1 1.153 1.772c.247.637.415 1.363.465 2.428.05 1.066.06 1.405.06 4.122 0 2.717-.01 3.056-.06 4.122-.05 1.065-.218 1.79-.465 2.428a4.9 4.9 0 0 1-1.153 1.772 4.9 4.9 0 0 1-1.772 1.153c-.637.247-1.363.415-2.428.465-1.066.05-1.405.06-4.122.06-2.717 0-3.056-.01-4.122-.06-1.065-.05-1.79-.218-2.428-.465a4.9 4.9 0 0 1-1.772-1.153 4.9 4.9 0 0 1-1.153-1.772c-.247-.637-.415-1.363-.465-2.428C2.01 15.056 2 14.717 2 12c0-2.717.01-3.056.06-4.122.05-1.066.218-1.79.465-2.428A4.9 4.9 0 0 1 3.678 3.678 4.9 4.9 0 0 1 5.45 2.525c.637-.247 1.363-.415 2.428-.465C8.944 2.01 9.283 2 12 2zm0 5a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 8.25a3.25 3.25 0 1 1 0-6.5 3.25 3.25 0 0 1 0 6.5zm5.4-8.44a1.17 1.17 0 1 0 0-2.34 1.17 1.17 0 0 0 0 2.34z"/></svg></a>
-<a href="https://www.tiktok.com/@.gowla" target="_blank" rel="noopener" aria-label="تيك توك" class="social-icon tt"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M16.6 5.82c-.9-.98-1.4-2.26-1.4-3.6h-3.28v13.66c0 1.6-1.3 2.9-2.9 2.9-1.6 0-2.9-1.3-2.9-2.9 0-1.6 1.3-2.9 2.9-2.9.28 0 .55.04.8.11V9.8a6.3 6.3 0 0 0-.8-.05 6.16 6.16 0 1 0 6.16 6.16V8.4a9.5 9.5 0 0 0 5.32 1.62V6.74a5.9 5.9 0 0 1-3.9-.92z"/></svg></a>
-</div></div><div class="copy"> الباشمهندس/ عبدالسلام إبراهيم درهم © 2026 قناة جولة </div></footer>
-<div class="modal" id="modal"><div class="modal-box"><button id="close">×</button><h2>البحث في أرشيف جولة</h2><input id="q" placeholder="ابحث عن خبر أو موضوع..."><div id="results"></div></div></div>
-<script src="app.js"></script>
-  <script src="/image-fallback-patch.js"></script>
-</body></html>
+<div class="home-v41" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <button class="icon-btn mobile-only" id="menuBtn" aria-label="القائمة">☰</button>
+      <a class="brand" href="/" aria-label="جولة">
+        <img src="/assets/logo.jpg" alt="جولة">
+        <span>جولة</span>
+      </a>
+      <nav id="mainNav">
+        <a class="active" href="/">الرئيسية</a>
+        <a href="#latest">آخر الأخبار</a>
+        <a href="#sections">الأقسام</a>
+        <a href="#video">فيديو</a>
+        <a href="/about.html">من نحن</a>
+      </nav>
+      <div class="top-actions">
+        <button class="icon-btn" id="searchBtn" aria-label="بحث">⌕</button>
+        <button class="icon-btn" id="darkBtn" aria-label="الوضع الليلي">☾</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="search-drawer" id="searchDrawer">
+    <div class="search-inner">
+      <input id="searchInput" placeholder="ابحث في أخبار جولة..." autocomplete="off">
+      <button class="search-close" id="searchClose">إغلاق</button>
+    </div>
+    <div id="searchResults"></div>
+  </div>
+
+  <div class="breaking-wrap" id="breakingWrap" hidden>
+    <div class="container breaking">
+      <span class="breaking-label"><i></i> عاجل</span>
+      <div class="breaking-track" id="breakingTrack"></div>
+    </div>
+  </div>
+
+  <main>
+    <section class="hero container">
+      <div class="hero-copy">
+        <span class="eyebrow">قناة جولة · V4.1</span>
+        <h1>خبرٌ واضح.<br><em>وصورةٌ أصدق.</em></h1>
+        <p>نرصد الحدث، نضعه في سياقه، ونقدمه لك بهدوء ودقة.</p>
+        <div class="hero-actions">
+          <a class="btn-primary" href="#latest">استكشف الأخبار</a>
+          <a class="btn-soft" href="#sections">تصفح الأقسام</a>
+        </div>
+      </div>
+      <div class="hero-mark">
+        <div class="hero-orb"></div>
+        <div class="hero-card">
+          <small>جولة</small>
+          <strong>من قلب الحدث</strong>
+          <span>محلي · السودان · العالم</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="container featured-section" id="featuredSection">
+      <div class="section-head">
+        <div><span>اختيار المحررين</span><h2>الأخبار الرئيسية</h2></div>
+        <a href="#latest">عرض الكل ←</a>
+      </div>
+      <div class="featured-grid" id="featuredGrid">
+        <div class="skeleton big"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </section>
+
+    <section class="container latest-section" id="latest">
+      <div class="section-head">
+        <div><span>تحديث مستمر</span><h2>آخر الأخبار</h2></div>
+        <div class="filters" id="categoryFilters"></div>
+      </div>
+      <div class="news-grid" id="latestGrid">
+        <div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div>
+      </div>
+    </section>
+
+    <section class="container sections-section" id="sections">
+      <div class="section-head"><div><span>استكشف</span><h2>الأقسام</h2></div></div>
+      <div class="section-cards" id="sectionCards"></div>
+    </section>
+
+    <section class="container video-section" id="video">
+      <div class="section-head"><div><span>شاهد</span><h2>فيديو جولة</h2></div></div>
+      <div class="video-grid" id="videoGrid"></div>
+    </section>
+
+    <section class="container newsletter">
+      <div>
+        <span class="eyebrow">ابقَ قريبًا</span>
+        <h2>النشرة البريدية</h2>
+        <p>أهم الأخبار إلى بريدك دون ضجيج.</p>
+      </div>
+      <form id="newsletterForm">
+        <input id="newsletterEmail" type="email" required placeholder="بريدك الإلكتروني">
+        <button>اشتراك</button>
+      </form>
+      <small id="newsletterMsg"></small>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <div><b>جولة</b><span>قناة الجولة | ALGWOLA</span></div>
+      <div class="footer-links"><a href="/">الرئيسية</a><a href="/about.html">من نحن</a><a href="/admin.html">غرفة الأخبار</a></div>
+      <small>© <span id="year"></span> جولة</small>
+    </div>
+  </footer>
+</div>
+<script src="/home-v41.js"></script>
+</body>
+</html>

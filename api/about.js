@@ -1,4 +1,5 @@
 const { getPool } = require('../lib/db');
+const { isAuthed } = require('../lib/auth');
 
 function esc(v = '') {
   return String(v).replace(/[&<>"']/g, (m) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m]));
@@ -6,9 +7,44 @@ function esc(v = '') {
 
 module.exports = async (req, res) => {
   const pool = getPool();
+  const qs = req.query || {};
+  const body = req.body || {};
   const siteUrl = 'https://gowlanow.vercel.app';
 
   try {
+    // ---- قائمة أعضاء الفريق (عامة، JSON — تستخدمها الصفحة الرئيسية) ----
+    if (req.method === 'GET' && qs.list === 'team') {
+      const { rows } = await pool.query('SELECT * FROM team ORDER BY order_index ASC, id ASC');
+      return res.status(200).json(rows);
+    }
+
+    // ---- عمليات إدارة الفريق (تتطلب توثيقًا) ----
+    if (req.method === 'POST') {
+      if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
+      const { rows } = await pool.query(
+        `INSERT INTO team (name, role, photo, bio, order_index) VALUES ($1,$2,$3,$4,$5) RETURNING *`,
+        [body.name || '', body.role || '', body.photo || '', body.bio || '', Number(body.order_index) || 0]
+      );
+      return res.status(200).json(rows[0]);
+    }
+    if (req.method === 'PUT') {
+      if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
+      if (!body.id) return res.status(400).json({ error: 'id مطلوب' });
+      const { rows } = await pool.query(
+        `UPDATE team SET name=$1, role=$2, photo=$3, bio=$4, order_index=$5 WHERE id=$6 RETURNING *`,
+        [body.name || '', body.role || '', body.photo || '', body.bio || '', Number(body.order_index) || 0, body.id]
+      );
+      return res.status(200).json(rows[0]);
+    }
+    if (req.method === 'DELETE') {
+      if (!isAuthed(req)) return res.status(401).json({ error: 'غير مصرح' });
+      const id = Number(qs.id || body.id);
+      if (!id) return res.status(400).json({ error: 'id مطلوب' });
+      await pool.query('DELETE FROM team WHERE id = $1', [id]);
+      return res.status(200).json({ ok: true });
+    }
+
+    // ---- صفحة "من نحن" العامة (GET بدون list=team) ----
     const { rows } = await pool.query('SELECT * FROM team ORDER BY order_index ASC, id ASC');
 
     const teamHtml = rows.length
@@ -64,6 +100,7 @@ module.exports = async (req, res) => {
   <a class="share-btn wa" target="_blank" rel="noopener" href="https://wa.me/?text=${encodeURIComponent('تعرّف على قناة جولة وفريق العمل')}%20${encodeURIComponent(siteUrl + '/about')}">واتساب</a>
   <a class="share-btn x" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${encodeURIComponent('تعرّف على قناة جولة وفريق العمل')}&url=${encodeURIComponent(siteUrl + '/about')}">X</a>
   <a class="share-btn fb" target="_blank" rel="noopener" href="https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(siteUrl + '/about')}">فيسبوك</a>
+  <a class="share-btn tg" target="_blank" rel="noopener" href="https://t.me/share/url?url=${encodeURIComponent(siteUrl + '/about')}&text=${encodeURIComponent('تعرّف على قناة جولة وفريق العمل')}">تيليجرام</a>
   <button class="share-btn copy" id="copyLink" type="button">نسخ الرابط</button>
 </div>
 </main>

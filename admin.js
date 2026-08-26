@@ -141,6 +141,9 @@ async function sendPushNow() {
   } catch { alert('تعذر الاتصال بالخادم.'); }
   if (btn) { btn.disabled = false; btn.textContent = '🔔 إرسال تنبيه لآخر خبر'; }
 }
+
+function articles() {
+  const a = get();
   $('#title').textContent = 'الأخبار';
   $('#view').innerHTML = `<div class="content"><div class="toolbar"><div><h2>إدارة الأخبار</h2><small>${a.length} مادة</small></div><button class="btn red" onclick="current='new';editId=null;render()">+ خبر جديد</button></div><div class="filters"><input id="searchArticles" placeholder="ابحث في العناوين..." oninput="filterArticles()"><select id="filterStatus" onchange="filterArticles()"><option value="">كل الحالات</option><option value="published">منشور</option><option value="draft">مسودة</option><option value="scheduled">مجدول</option><option value="archived">مؤرشف</option></select><select id="filterCat" onchange="filterArticles()"><option value="">كل التصنيفات</option>${['محلي', 'السودان', 'العالم', 'تغطيات جولة', 'توثيق', 'تقارير', 'برامج', 'مجتمع', 'فيديو'].map(c => `<option>${c}</option>`).join('')}</select></div><div id="articleTable" class="table"></div></div>`;
   filterArticles();
@@ -289,7 +292,6 @@ async function saveArticle() {
       } catch { /* الاستطلاع اختياري، لا نوقف الحفظ لأجله */ }
     }
   }
-  } catch { alert('تعذر الاتصال بالخادم.'); if (btn) { btn.disabled = false; btn.textContent = 'حفظ الخبر'; } return; }
   clearDraftLocal();
   current = 'articles'; editId = null; await render();
 }
@@ -517,3 +519,4 @@ async function delComment(id) {
   } catch { alert('تعذر الاتصال بالخادم.'); return; }
   await render();
 }
+

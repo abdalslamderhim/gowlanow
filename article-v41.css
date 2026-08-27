@@ -718,5 +718,11 @@ body.dark .article-v41-hero-caption{
   .article-v41-footer-inner{
     flex-direction:column;
     align-items:flex-start;
+    @media (max-width: 680px) {
+  .article-v41-share { display: none; }
+}
+@media (min-width: 681px) {
+  .article-v41-mobile-share { display: none; }
+}
   }
 }

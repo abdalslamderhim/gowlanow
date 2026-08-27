@@ -5,3 +5,28 @@
 .share-row button,.share-row a{font-family:inherit;font-size:11px;font-weight:800;padding:9px 14px;border-radius:8px;border:1px solid var(--l);background:var(--s);color:var(--i);cursor:pointer}
 .share-row button{background:var(--b);color:#fff;border-color:var(--b)}
 .share-row a:hover,.share-row button:hover{opacity:.9}
+
+/* ===== تحسينات تفاعلية إضافية (V-extra) ===== */
+/* تحريك فعلي لشريط الأخبار العاجلة عند وجود أكثر من خبر عاجل واحد */
+@keyframes marquee-scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.marquee-track{display:inline-block;white-space:nowrap;padding-inline-start:100%;animation:marquee-scroll 22s linear infinite}
+.breaking-in:hover .marquee-track{animation-play-state:paused}
+
+/* نبضة حول نقطة "عاجل" لجذب الانتباه */
+@keyframes live-pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,72,72,.55)}70%{box-shadow:0 0 0 7px rgba(255,72,72,0)}}
+.live{animation:live-pulse 1.8s ease-out infinite}
+
+/* تفاعل عند المرور بالماوس على البطاقات والعناصر */
+.card,.video,.program,.person,.top-item{transition:transform .25s ease,box-shadow .25s ease}
+.card:hover,.video:hover{transform:translateY(-4px);box-shadow:0 14px 30px -18px rgba(10,25,70,.35)}
+.program:hover,.person:hover{transform:translateY(-3px);box-shadow:0 10px 22px -14px rgba(10,25,70,.25)}
+.top-item:hover{transform:translateX(-3px)}
+
+/* ظهور تدريجي للعناصر عند التمرير للأسفل */
+.reveal-init{opacity:0;transform:translateY(16px)}
+.reveal-init.revealed{opacity:1;transform:none;transition:opacity .55s ease,transform .55s ease}
+
+@media(prefers-reduced-motion:reduce){
+  .marquee-track,.live{animation:none}
+  .reveal-init{opacity:1;transform:none}
+}

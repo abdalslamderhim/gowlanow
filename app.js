@@ -8,22 +8,46 @@ const fallbackSeed = [
 
 function esc(v = '') { return String(v).replace(/[&<>"']/g, m => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m])); }
 
+// جلب مع مهلة زمنية — طلب معلّق لن يُبقي الصفحة تنتظر للأبد
+async function fetchWithTimeout(url, ms = 8000) {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    const res = await fetch(url, { signal: ctrl.signal });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+// بانر "تعذر الاتصال" مع زر إعادة المحاولة — يظهر مرة واحدة بحد أقصى
+function showOfflineBanner(label) {
+  if (document.querySelector('.offline-note')) return;
+  const el = document.createElement('div');
+  el.className = 'offline-note';
+  el.innerHTML = `⚠ تعذر تحميل ${esc(label)} من الخادم — يتم عرض محتوى محفوظ مؤقتًا <button type="button" class="retry">إعادة المحاولة</button>`;
+  el.querySelector('.retry').onclick = () => { el.remove(); load(); };
+  document.body.prepend(el);
+}
+
+// مؤشر تحميل بسيط أعلى الصفحة، يظهر أثناء جلب البيانات ويختفي بعدها
+function showLoader() { document.documentElement.classList.add('is-loading'); }
+function hideLoader() { document.documentElement.classList.remove('is-loading'); }
+
 async function getNews() {
   try {
-    const res = await fetch(`${FN}/articles`);
-    if (!res.ok) throw new Error('bad response');
-    const rows = await res.json();
+    const rows = await fetchWithTimeout(`${FN}/articles`);
     return Array.isArray(rows) && rows.length ? rows : fallbackSeed;
   } catch {
+    showOfflineBanner('الأخبار');
     return fallbackSeed;
   }
 }
 
 async function getReporters() {
   try {
-    const res = await fetch(`${FN}/reporter`);
-    if (!res.ok) throw new Error('bad response');
-    const rows = await res.json();
+    const rows = await fetchWithTimeout(`${FN}/reporter`);
     return Array.isArray(rows) && rows.length ? rows : [];
   } catch {
     return [];
@@ -32,9 +56,7 @@ async function getReporters() {
 
 async function getTeam() {
   try {
-    const res = await fetch(`${FN}/about?list=team`);
-    if (!res.ok) throw new Error('bad response');
-    const rows = await res.json();
+    const rows = await fetchWithTimeout(`${FN}/about?list=team`);
     return Array.isArray(rows) ? rows : [];
   } catch {
     return [];
@@ -100,6 +122,7 @@ function openStory(id) {
 }
 
 async function load() {
+  showLoader();
   const [news, reps, team] = await Promise.all([getNews(), getReporters(), getTeam()]);
   allNews = news.map(n => ({ ...n, id: Number(n.id) }));
   render(allNews, reps);
@@ -109,24 +132,34 @@ async function load() {
       ? team.map(m => `<div class="team-card"><img src="${esc(m.photo || 'assets/studio.jpg')}" alt="${esc(m.name)}"><h3>${esc(m.name)}</h3><span>${esc(m.role || '')}</span>${m.bio ? `<p>${esc(m.bio)}</p>` : ''}</div>`).join('')
       : `<p style="opacity:.7">لم تتم إضافة أعضاء الفريق بعد.</p>`;
   }
+  hideLoader();
 }
 
 $('#search').onclick = () => { $('#modal').classList.add('open'); $('#q').focus(); };
 $('#close').onclick = () => $('#modal').classList.remove('open');
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#modal').classList.contains('open')) {
+    $('#modal').classList.remove('open');
+  }
+});
 let searchDebounce = null;
+let searchAbort = null;
 $('#q').oninput = e => {
   const q = e.target.value.trim();
   clearTimeout(searchDebounce);
   if (!q) { $('#results').innerHTML = ''; return; }
   $('#results').innerHTML = '<p style="opacity:.6">جاري البحث...</p>';
   searchDebounce = setTimeout(async () => {
+    searchAbort?.abort();
+    searchAbort = new AbortController();
     try {
-      const res = await fetch(`${FN}/articles?q=${encodeURIComponent(q)}`);
+      const res = await fetch(`${FN}/articles?q=${encodeURIComponent(q)}`, { signal: searchAbort.signal });
       const results = await res.json();
       $('#results').innerHTML = Array.isArray(results) && results.length
         ? results.map(r => `<div class="result" onclick="location.href='/news/${r.id}'" style="cursor:pointer"><b>${esc(r.title)}</b><small>${esc(r.category)} · ${esc(r.time_label || '')}</small></div>`).join('')
         : '<p>لا توجد نتائج.</p>';
-    } catch {
+    } catch (err) {
+      if (err.name === 'AbortError') return;
       $('#results').innerHTML = '<p>تعذر البحث، حاول مرة أخرى.</p>';
     }
   }, 350);

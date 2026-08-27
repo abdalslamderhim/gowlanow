@@ -202,3 +202,30 @@ if ('serviceWorker' in navigator) {
 
 load();
 
+
+// ===== V-extra: ظهور تدريجي للعناصر عند التمرير (لا يمس أي دالة موجودة) =====
+(function () {
+  function setupScrollReveal() {
+    const targets = document.querySelectorAll('.card,.video,.program,.person,.top-item');
+    if (!targets.length) return;
+    if (!('IntersectionObserver' in window)) {
+      targets.forEach(el => el.classList.add('revealed'));
+      return;
+    }
+    const io = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('revealed');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.15 });
+    targets.forEach(el => { el.classList.add('reveal-init'); io.observe(el); });
+  }
+  function trySetupReveal(attemptsLeft) {
+    const hasContent = document.querySelectorAll('.card,.video,.program,.person,.top-item').length > 0;
+    if (hasContent) { setupScrollReveal(); return; }
+    if (attemptsLeft > 0) setTimeout(() => trySetupReveal(attemptsLeft - 1), 400);
+  }
+  window.addEventListener('load', () => trySetupReveal(10));
+})();

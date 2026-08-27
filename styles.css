@@ -30,3 +30,20 @@
   .marquee-track,.live{animation:none}
   .reveal-init{opacity:1;transform:none}
 }
+
+/* ===== شريط تحميل علوي + بانر انقطاع الاتصال (V-extra 2) ===== */
+html.is-loading::before{
+  content:"";position:fixed;top:0;right:0;left:0;height:3px;z-index:999;
+  background:linear-gradient(90deg,var(--b),var(--r));
+  background-size:200% 100%;animation:load-bar 1s ease-in-out infinite;
+}
+@keyframes load-bar{0%{background-position:0% 0}100%{background-position:200% 0}}
+.offline-note{
+  position:sticky;top:0;z-index:998;background:#fff3cd;color:#664d03;
+  padding:8px 16px;text-align:center;font-size:12px;font-family:Cairo,Arial;
+}
+.offline-note .retry{
+  margin-inline-start:8px;border:1px solid #664d03;background:transparent;color:#664d03;
+  border-radius:5px;padding:3px 10px;font-size:11px;font-family:inherit;cursor:pointer;
+}
+@media(prefers-reduced-motion:reduce){ html.is-loading::before{ animation:none } }

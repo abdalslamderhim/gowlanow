@@ -1,6 +1,9 @@
 const { getPool } = require('../lib/db');
 const { isAuthed } = require('../lib/auth');
 
+// أعمدة كافية لعرض القائمة (بدون body/gallery/video_url الثقيلة)
+const LIST_COLUMNS = 'id, title, category, excerpt, image, status, breaking, featured, reporter, time_label, scheduled_at, created_at, updated_at';
+
 module.exports = async (req, res) => {
   const pool = getPool();
   const method = req.method;
@@ -24,15 +27,29 @@ module.exports = async (req, res) => {
     // ---- القراءة: عامة للزوار (منشور، أو مجدول وحان وقته)، أو كاملة إذا كانت الهوية موثّقة ----
     if (method === 'GET') {
       const authed = isAuthed(req);
+
+      if (!authed) {
+        // زائر عادي: أعمدة خفيفة فقط + حد أقصى للعدد لتقليل نقل البيانات
+        const limit = Math.min(Number(qs.limit) || 60, 100);
+        const { rows } = await pool.query(
+          `SELECT ${LIST_COLUMNS} FROM articles
+           WHERE status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now())
+           ORDER BY id DESC LIMIT $1`,
+          [limit]
+        );
+        // تخزين مؤقت على حافة Vercel لتقليل الضغط على قاعدة البيانات والشبكة
+        res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+        return res.status(200).json(rows);
+      }
+
+      // لوحة الإدارة (موثّقة): لا تزال تحتاج كل الأعمدة، لكن بحد أقصى معقول
       let text = 'SELECT * FROM articles';
       const params = [];
-      if (!authed) {
-        text += ` WHERE status = 'published' OR (status = 'scheduled' AND scheduled_at IS NOT NULL AND scheduled_at <= now())`;
-      } else if (qs.status) {
+      if (qs.status) {
         text += ' WHERE status = $1';
         params.push(qs.status);
       }
-      text += ' ORDER BY id DESC';
+      text += ' ORDER BY id DESC LIMIT 300';
       const { rows } = await pool.query(text, params);
       return res.status(200).json(rows);
     }

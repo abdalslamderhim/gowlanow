@@ -39,7 +39,7 @@ async function loadReporters() {
 }
 async function loadTeam() {
   try {
-    const res = await fetch(`${FN}/about`, { headers: authHeaders() });
+    const res = await fetch(`${FN}/about?list=team`, { headers: authHeaders() });
     if (res.status === 401) { handleAuthExpired(); return; }
     const rows = await res.json();
     teamCache = Array.isArray(rows) ? rows.map(r => ({ ...r, id: Number(r.id) })) : [];

@@ -8,6 +8,10 @@
     {
       "source": "/article/:id",
       "destination": "/api/news"
+    },
+    {
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap"
     }
   ]
 }
